@@ -29,3 +29,17 @@ Oqtane.Server/wwwroot/Modules
 Oqtane.Server/wwwroot/Themes
 !Oqtane.Server/wwwroot/Themes/Oqtane.Themes.*
 !Oqtane.Server/wwwroot/Themes/Templates
+
+/Oqtane.Server/wwwroot/_content
+/Oqtane.Server/wwwroot/Public
+/Oqtane.Server/wwwroot/SalesSearch
+/Oqtane.Server/wwwroot/Home
+
+/Oqtane.Server/wwwroot/favicon-dev.ico
+/Oqtane.Server/wwwroot/images/hubspoticon24x24.png
+/Oqtane.Server/wwwroot/images/hubspoticon32x32.png
+/Oqtane.Server/wwwroot/images/hubspoticon64x64.png
+/Oqtane.Server/wwwroot/images/hubspoticonfullsize.png
+/Oqtane.Server/wwwroot/js/ScrollToSelected.js
+/Oqtane.Server/wwwroot/js/exporter.js
+/Oqtane.Server/wwwroot/favicon.ico

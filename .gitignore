@@ -43,3 +43,5 @@ Oqtane.Server/wwwroot/Themes
 /Oqtane.Server/wwwroot/js/ScrollToSelected.js
 /Oqtane.Server/wwwroot/js/exporter.js
 /Oqtane.Server/wwwroot/favicon.ico
+/Oqtane.Server/appsettings.json
+/Oqtane.Server/appsettings.release.json

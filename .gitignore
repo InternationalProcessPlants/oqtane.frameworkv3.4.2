@@ -14,6 +14,7 @@ _ReSharper.Caches
 .DS_Store
 
 Oqtane.Server/appsettings.json
+Oqtane.Server/appsettings.release.json
 Oqtane.Server/Data
 
 Oqtane.Server/Properties/PublishProfiles/FolderProfile.pubxml
@@ -33,3 +34,5 @@ Oqtane.Server/wwwroot/Themes/*
 !Oqtane.Server/wwwroot/Themes/Templates
 Oqtane.Server/wwwroot/Themes/Templates/*
 Oqtane.Server/wwwroot/Themes/Templates/External
+
+Oqtane.Server/wwwroot/_content/*

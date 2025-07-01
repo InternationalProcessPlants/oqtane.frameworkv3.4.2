@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Oqtane.Interfaces;
 using Oqtane.Providers;
 using Oqtane.Services;
 using Oqtane.Shared;
@@ -7,16 +8,17 @@ namespace Microsoft.Extensions.DependencyInjection
 {
     public static class OqtaneServiceCollectionExtensions
     {
-        public static IServiceCollection AddOqtaneAuthorization(this IServiceCollection services)
+        public static IServiceCollection AddOqtaneAuthentication(this IServiceCollection services)
         {
             services.AddAuthorizationCore();
+            services.AddCascadingAuthenticationState();
             services.AddScoped<IdentityAuthenticationStateProvider>();
             services.AddScoped<AuthenticationStateProvider>(s => s.GetRequiredService<IdentityAuthenticationStateProvider>());
 
             return services;
         }
 
-        public static IServiceCollection AddOqtaneScopedServices(this IServiceCollection services)
+        public static IServiceCollection AddOqtaneClientScopedServices(this IServiceCollection services)
         {
             services.AddScoped<SiteState>();
             services.AddScoped<IInstallationService, InstallationService>();
@@ -49,6 +51,10 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddScoped<IUrlMappingService, UrlMappingService>();
             services.AddScoped<IVisitorService, VisitorService>();
             services.AddScoped<ISyncService, SyncService>();
+
+            // providers
+            services.AddScoped<ITextEditor, Oqtane.Modules.Controls.QuillJSTextEditor>();
+            services.AddScoped<ITextEditor, Oqtane.Modules.Controls.TextAreaTextEditor>();
 
             return services;
         }

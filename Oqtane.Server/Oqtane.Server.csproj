@@ -1,30 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Configurations>Debug;Release</Configurations>
-    <Version>3.4.2</Version>
+    <Version>5.2.4</Version>
     <Product>Oqtane</Product>
     <Authors>Shaun Walker</Authors>
     <Company>.NET Foundation</Company>
-    <Description>Modular Application Framework for Blazor and MAUI</Description>
+    <Description>CMS and Application Framework for Blazor and .NET MAUI</Description>
     <Copyright>.NET Foundation</Copyright>
     <PackageProjectUrl>https://www.oqtane.org</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/oqtane/oqtane.framework/blob/dev/LICENSE</PackageLicenseUrl>
-    <PackageReleaseNotes>https://github.com/oqtane/oqtane.framework/releases/tag/v3.4.2</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/oqtane/oqtane.framework/releases/tag/v5.2.4</PackageReleaseNotes>
     <RepositoryUrl>https://github.com/oqtane/oqtane.framework</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <RootNamespace>Oqtane</RootNamespace>
     <IsPackable>true</IsPackable>
     <DefineConstants>$(DefineConstants);OQTANE;OQTANE3</DefineConstants>
     <PreserveCompilationContext>true</PreserveCompilationContext>
+    <SatelliteResourceLanguages>none</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="wwwroot\Modules\Templates\**" />
-    <Content Remove="wwwroot\Modules\Templates\**" />
-    <EmbeddedResource Remove="wwwroot\Modules\Templates\**" />
     <Compile Remove="wwwroot\Themes\Templates\**" />
+    <Content Remove="wwwroot\Modules\Templates\**" />
     <Content Remove="wwwroot\Themes\Templates\**" />
+    <EmbeddedResource Remove="wwwroot\Modules\Templates\**" />
     <EmbeddedResource Remove="wwwroot\Themes\Templates\**" />
   </ItemGroup>
   <ItemGroup>
@@ -32,21 +33,21 @@
     <EmbeddedResource Include="Scripts\MigrateTenant.sql" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="6.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.ViewFeatures" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="4.1.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="6.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.3" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.3">
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.67" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="8.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Localization" Version="6.0.3" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.0" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.0.7" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="8.0.10" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.10" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.10" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Oqtane.Client\Oqtane.Client.csproj" />
@@ -55,13 +56,21 @@
   <ItemGroup>
     <ModuleTemplateFiles Include="$(ProjectDir)wwwroot\Modules\Templates\**\*.*" />
     <ThemeTemplateFiles Include="$(ProjectDir)wwwroot\Themes\Templates\**\*.*" />
+    <MySQLFiles Include="$(OutputPath)Oqtane.Database.MySQL.dll;$(OutputPath)Oqtane.Database.MySQL.pdb;$(OutputPath)MySql.EntityFrameworkCore.dll;$(OutputPath)MySql.Data.dll" />
+    <PostgreSQLFiles Include="$(OutputPath)Oqtane.Database.PostgreSQL.dll;$(OutputPath)Oqtane.Database.PostgreSQL.pdb;$(OutputPath)EFCore.NamingConventions.dll;$(OutputPath)Npgsql.EntityFrameworkCore.PostgreSQL.dll;$(OutputPath)Npgsql.dll" />
+    <SqliteFiles Include="$(OutputPath)Oqtane.Database.Sqlite.dll;$(OutputPath)Oqtane.Database.Sqlite.pdb;$(OutputPath)Microsoft.EntityFrameworkCore.Sqlite.dll" />
+    <SqlServerFiles Include="$(OutputPath)Oqtane.Database.SqlServer.dll;$(OutputPath)Oqtane.Database.SqlServer.pdb;$(OutputPath)Microsoft.EntityFrameworkCore.SqlServer.dll" />
   </ItemGroup>
   <Target Name="AddPayloadsFolder" AfterTargets="Publish">
     <Copy SourceFiles="@(ModuleTemplateFiles)" DestinationFiles="@(ModuleTemplateFiles->'$(PublishDir)wwwroot\Modules\Templates\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
     <Copy SourceFiles="@(ThemeTemplateFiles)" DestinationFiles="@(ThemeTemplateFiles->'$(PublishDir)wwwroot\Themes\Templates\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(MySQLFiles)" DestinationFiles="@(MySQLFiles->'$(PublishDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(PostgreSQLFiles)" DestinationFiles="@(PostgreSQLFiles->'$(PublishDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(SqliteFiles)" DestinationFiles="@(SqliteFiles->'$(PublishDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(SqlServerFiles)" DestinationFiles="@(SqlServerFiles->'$(PublishDir)%(Filename)%(Extension)')" SkipUnchangedFiles="false" />
   </Target>
   <ItemGroup>
     <!-- extends watching group to include *.dll files and exclude the ones cause an infinite loop -->
-    <Watch Include="**\*.dll" Exclude="**\Microsoft.EntityFrameworkCore.*.dll;**\Oqtane.Database.*.dll;"/>
+    <Watch Include="**\*.dll" Exclude="**\Microsoft.EntityFrameworkCore.*.dll;**\Oqtane.Database.*.dll;" />
   </ItemGroup>
 </Project>

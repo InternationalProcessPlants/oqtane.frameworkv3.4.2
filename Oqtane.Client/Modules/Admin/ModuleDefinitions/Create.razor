@@ -13,13 +13,13 @@
     <form @ref="form" class="@(validated ? "was-validated" : "needs-validation")" novalidate>
         <div class="container">
             <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="owner" HelpText="Enter the name of the organization who is developing this module. It should not contain spaces or punctuation." ResourceKey="OwnerName">Owner Name: </Label>
+                <Label Class="col-sm-3" For="owner" HelpText="Enter the name of the organization who is developing this module. It should not contain spaces or punctuation or the word oqtane." ResourceKey="OwnerName">Owner Name: </Label>
                 <div class="col-sm-9">
                     <input id="owner" class="form-control" @bind="@_owner" required />
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="module" HelpText="Enter a name for this module. It should not contain spaces or punctuation." ResourceKey="ModuleName">Module Name: </Label>
+                <Label Class="col-sm-3" For="module" HelpText="Enter a name for this module. It should not contain spaces or punctuation or the word oqtane." ResourceKey="ModuleName">Module Name: </Label>
                 <div class="col-sm-9">
                     <input id="module" class="form-control" @bind="@_module" required />
                 </div>
@@ -89,7 +89,10 @@
 
     protected override void OnInitialized()
     {
-        AddModuleMessage(Localizer["Info.Module.Development"], MessageType.Info);
+        if (!NavigationManager.BaseUri.Contains("localhost:"))
+        {
+            AddModuleMessage(Localizer["Info.Module.Development"], MessageType.Info);
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -115,10 +118,18 @@
             {
                 if (IsValid(_owner) && IsValid(_module) && _owner != _module && _template != "-")
                 {
-                    var moduleDefinition = new ModuleDefinition { Owner = _owner, Name = _module, Description = _description, Template = _template, Version = _reference };
-                    moduleDefinition = await ModuleDefinitionService.CreateModuleDefinitionAsync(moduleDefinition);
-                    GetLocation();
-                    AddModuleMessage(string.Format(Localizer["Success.Module.Create"], NavigateUrl("admin/system")), MessageType.Success);
+                    if (IsValidXML(_description))
+                    {
+                        var template = _templates.FirstOrDefault(item => item.Name == _template);
+                        var moduleDefinition = new ModuleDefinition { Owner = _owner, Name = _module, Description = _description, Template = _template, Version = _reference, ModuleDefinitionName = template.Namespace };
+                        moduleDefinition = await ModuleDefinitionService.CreateModuleDefinitionAsync(moduleDefinition);
+                        GetLocation();
+                        AddModuleMessage(string.Format(Localizer["Success.Module.Create"], NavigateUrl("admin/system")), MessageType.Success);
+                    }
+                    else
+                    {
+                        AddModuleMessage(Localizer["Message.Require.ValidDescription"], MessageType.Warning);
+                    }
                 }
                 else
                 {
@@ -139,7 +150,13 @@
     private bool IsValid(string name)
     {
         // must contain letters, underscores and digits and first character must be letter or underscore
-		return !string.IsNullOrEmpty(name) && name.ToLower() != "module" && !name.ToLower().Contains("oqtane") && Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$");
+        return !string.IsNullOrEmpty(name) && name.ToLower() != "module" && !name.ToLower().Contains("oqtane") && Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$");
+    }
+
+    private bool IsValidXML(string description)
+    {
+        // must contain letters, digits, or spaces
+        return Regex.IsMatch(description, "^[A-Za-z0-9 .,!?]+$");
     }
 
     private void TemplateChanged(ChangeEventArgs e)
@@ -151,7 +168,7 @@
             var template = _templates.FirstOrDefault(item => item.Name == _template);
             _minversion = template.Version;
         }
-		GetLocation();
+        GetLocation();
     }
 
     private void GetLocation()
@@ -160,8 +177,14 @@
         if (_owner != "" && _module != "" && _template != "-")
         {
             var template = _templates.FirstOrDefault(item => item.Name == _template);
-            _location = template.Location + _owner + "." + _module;
-
+            if (!string.IsNullOrEmpty(template.Namespace))
+            {
+                _location = template.Location + template.Namespace.Replace("[Owner]", _owner).Replace("[Module]", _module);
+            }
+            else
+            {
+                _location = template.Location + _owner + ".Module." + _module;
+            }
         }
         StateHasChanged();
     }

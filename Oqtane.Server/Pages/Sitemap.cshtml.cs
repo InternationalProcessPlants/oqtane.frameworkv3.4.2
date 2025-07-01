@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Xml;
@@ -46,13 +47,23 @@ namespace Oqtane.Pages
             var sitemap = new List<Sitemap>();
 
             // build site map
+            var rooturl = _alias.Protocol + (string.IsNullOrEmpty(_alias.Path) ? _alias.Name : _alias.Name.Substring(0, _alias.Name.IndexOf("/")));
             var moduleDefinitions = _moduleDefinitions.GetModuleDefinitions(_alias.SiteId).ToList();
             var pageModules = _pageModules.GetPageModules(_alias.SiteId);
             foreach (var page in _pages.GetPages(_alias.SiteId))
             {
-                if (_userPermissions.IsAuthorized(null, PermissionNames.View, page.PermissionList) && page.IsNavigation)
+                if (_userPermissions.IsAuthorized(null, PermissionNames.View, page.PermissionList) && !Constants.InternalPagePaths.Contains(page.Path))
                 {
-                    sitemap.Add(new Sitemap { Url = _alias.Protocol + _alias.Name + Utilities.NavigateUrl(_alias.Path, page.Path, ""), ModifiedOn = page.ModifiedOn });
+                    var pageurl = rooturl;
+                    if (string.IsNullOrEmpty(page.Url))
+                    {
+                        pageurl += Utilities.NavigateUrl(_alias.Path, page.Path, "");
+                    }
+                    else
+                    {
+                        pageurl += (page.Url.StartsWith("/") ? "" : "/") + page.Url;
+                    }
+                    sitemap.Add(new Sitemap { Url = pageurl, ModifiedOn = DateTime.UtcNow });
 
                     foreach (var pageModule in pageModules.Where(item => item.PageId == page.PageId))
                     {
@@ -62,7 +73,7 @@ namespace Oqtane.Pages
                             if (moduleDefinition != null && moduleDefinition.ServerManagerType != "")
                             {
                                 Type moduletype = Type.GetType(moduleDefinition.ServerManagerType);
-                                if (moduletype != null && moduletype.GetInterface("ISitemap") != null)
+                                if (moduletype != null && moduletype.GetInterface(nameof(ISitemap)) != null)
                                 {
                                     try
                                     {
@@ -71,7 +82,7 @@ namespace Oqtane.Pages
                                         var urls = ((ISitemap)moduleobject).GetUrls(_alias.Path, page.Path, pageModule.Module);
                                         foreach (var url in urls)
                                         {
-                                            sitemap.Add(new Sitemap { Url = _alias.Protocol + _alias.Name + url.Url, ModifiedOn = url.ModifiedOn });
+                                            sitemap.Add(new Sitemap { Url = rooturl + url.Url, ModifiedOn = DateTime.UtcNow });
                                         }
                                     }
                                     catch (Exception ex)
@@ -86,19 +97,21 @@ namespace Oqtane.Pages
             }
 
             // write XML
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Indent = true;
-            settings.IndentChars = ("  ");
-            settings.CloseOutput = true;
-            settings.OmitXmlDeclaration = true;
-            settings.WriteEndDocumentOnClose = true;
+            var builder = new StringBuilder();
+            var stringWriter = new StringWriterWithEncoding(builder, Encoding.UTF8);
 
-            StringBuilder builder = new StringBuilder();
-            using (XmlWriter writer = XmlWriter.Create(builder, settings))
+            var settings = new XmlWriterSettings
             {
-                writer.WriteStartDocument();
-                writer.WriteStartElement("urlset", "http://www.sitemaps.org/schemas/sitemap/0.9");
+                Indent = true,
+                IndentChars = "  ",
+                NewLineChars = Environment.NewLine,
+                CloseOutput = true,
+                WriteEndDocumentOnClose = true
+            };
 
+            using (var writer = XmlWriter.Create(stringWriter, settings))
+            {
+                writer.WriteStartElement("urlset", "http://www.sitemaps.org/schemas/sitemap/0.9");
                 foreach (var url in sitemap)
                 {
                     writer.WriteStartElement("url");
@@ -106,10 +119,29 @@ namespace Oqtane.Pages
                     writer.WriteElementString("lastmod", url.ModifiedOn.ToString("yyyy-MM-dd"));
                     writer.WriteEndElement();
                 }
+                writer.WriteEndElement();
                 writer.Close();
             }
 
-            return Content(builder.ToString());
+            return Content(builder.ToString(), "application/xml");
+        }
+    }
+
+    public class StringWriterWithEncoding : StringWriter
+    {
+        private readonly Encoding _encoding;
+
+        public StringWriterWithEncoding(StringBuilder builder, Encoding encoding) : base(builder)
+        {
+            this._encoding = encoding;
+        }
+
+        public override Encoding Encoding
+        {
+            get
+            {
+                return this._encoding;
+            }
         }
     }
 }

@@ -12,6 +12,10 @@ using Oqtane.Infrastructure;
 using Oqtane.Repository;
 using System.Text.Json;
 using System.Net;
+using System.Reflection.Metadata;
+using System;
+using Microsoft.Extensions.DependencyInjection;
+using Oqtane.Infrastructure.Interfaces;
 
 // ReSharper disable StringIndexOfIsCultureSpecific.1
 
@@ -23,14 +27,22 @@ namespace Oqtane.Controllers
         private readonly IThemeRepository _themes;
         private readonly IInstallationManager _installationManager;
         private readonly IWebHostEnvironment _environment;
+        private readonly ITenantManager _tenantManager;
+        private readonly ISyncManager _syncManager;
         private readonly ILogManager _logger;
+        private readonly Alias _alias;
+        private readonly IServiceProvider _serviceProvider;
 
-        public ThemeController(IThemeRepository themes, IInstallationManager installationManager, IWebHostEnvironment environment, ILogManager logger)
+        public ThemeController(IThemeRepository themes, IInstallationManager installationManager, IWebHostEnvironment environment, ITenantManager tenantManager, ISyncManager syncManager, ILogManager logger, IServiceProvider serviceProvider)
         {
             _themes = themes;
             _installationManager = installationManager;
             _environment = environment;
+            _tenantManager = tenantManager;
+            _syncManager = syncManager;
             _logger = logger;
+            _alias = tenantManager.GetAlias();
+            _serviceProvider = serviceProvider;
         }
 
         // GET: api/<controller>
@@ -39,6 +51,41 @@ namespace Oqtane.Controllers
         public IEnumerable<Theme> Get()
         {
             return _themes.GetThemes();
+        }
+
+        // GET api/<controller>/5?siteid=x
+        [HttpGet("{id}")]
+        public Theme Get(int id, string siteid)
+        {
+            int SiteId;
+            if (int.TryParse(siteid, out SiteId) && SiteId == _alias.SiteId)
+            {
+                return _themes.GetTheme(id, SiteId);
+            }
+            else
+            {
+                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Theme Get Attempt {ThemeId} {SiteId}", id, siteid);
+                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                return null;
+            }
+        }
+
+        // PUT api/<controller>/5
+        [HttpPut("{id}")]
+        [Authorize(Roles = RoleNames.Admin)]
+        public void Put(int id, [FromBody] Theme theme)
+        {
+            if (ModelState.IsValid && theme.SiteId == _alias.SiteId && theme.ThemeId == id && _themes.GetTheme(theme.ThemeId,theme.SiteId) != null)
+            {
+                _themes.UpdateTheme(theme);
+                _syncManager.AddSyncEvent(_alias, EntityNames.Theme, theme.ThemeId, SyncEventActions.Update);
+                _logger.Log(LogLevel.Information, this, LogFunction.Update, "Theme Updated {Theme}", theme);
+            }
+            else
+            {
+                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Theme Put Attempt {Theme}", theme);
+                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+            }
         }
 
         // DELETE api/<controller>/xxx
@@ -74,7 +121,9 @@ namespace Oqtane.Controllers
                 }
 
                 // remove theme
-                _themes.DeleteTheme(theme.ThemeName);
+                _themes.DeleteTheme(theme.ThemeId);
+                _syncManager.AddSyncEvent(_alias, EntityNames.Theme, theme.ThemeId, SyncEventActions.Delete);
+                _syncManager.AddSyncEvent(_alias, EntityNames.Site, theme.SiteId, SyncEventActions.Refresh);
                 _logger.Log(LogLevel.Information, this, LogFunction.Delete, "Theme Removed For {ThemeName}", theme.ThemeName);
             }
             else
@@ -92,23 +141,26 @@ namespace Oqtane.Controllers
             var templates = new List<Template>();
             var root = Directory.GetParent(_environment.ContentRootPath);
             string templatePath = Utilities.PathCombine(_environment.WebRootPath, "Themes", "Templates", Path.DirectorySeparatorChar.ToString());
-            foreach (string directory in Directory.GetDirectories(templatePath))
+            if (Directory.Exists(templatePath))
             {
-                string name = directory.Replace(templatePath, "");
-                if (System.IO.File.Exists(Path.Combine(directory, "template.json")))
+                foreach (string directory in Directory.GetDirectories(templatePath))
                 {
-                    var template = JsonSerializer.Deserialize<Template>(System.IO.File.ReadAllText(Path.Combine(directory, "template.json")));
-                    template.Name = name;
-                    template.Location = "";
-                    if (template.Type.ToLower() != "internal")
+                    string name = directory.Replace(templatePath, "");
+                    if (System.IO.File.Exists(Path.Combine(directory, "template.json")))
                     {
-                        template.Location = Utilities.PathCombine(root.Parent.ToString(), Path.DirectorySeparatorChar.ToString());
+                        var template = JsonSerializer.Deserialize<Template>(System.IO.File.ReadAllText(Path.Combine(directory, "template.json")));
+                        template.Name = name;
+                        template.Location = "";
+                        if (template.Type.ToLower() != "internal")
+                        {
+                            template.Location = Utilities.PathCombine(root.Parent.ToString(), Path.DirectorySeparatorChar.ToString());
+                        }
+                        templates.Add(template);
                     }
-                    templates.Add(template);
-                }
-                else
-                {
-                    templates.Add(new Template { Name = name, Title = name, Type = "External", Version = "", Location = Utilities.PathCombine(root.Parent.ToString(), Path.DirectorySeparatorChar.ToString()) });
+                    else
+                    {
+                        templates.Add(new Template { Name = name, Title = name, Type = "External", Version = "", Location = Utilities.PathCombine(root.Parent.ToString(), Path.DirectorySeparatorChar.ToString()) });
+                    }
                 }
             }
             return templates;
@@ -125,15 +177,24 @@ namespace Oqtane.Controllers
                 DirectoryInfo rootFolder = Directory.GetParent(_environment.ContentRootPath);
                 string templatePath = Utilities.PathCombine(_environment.WebRootPath, "Themes", "Templates", theme.Template, Path.DirectorySeparatorChar.ToString());
 
-                if (theme.Template.ToLower().Contains("internal"))
+                if (!string.IsNullOrEmpty(theme.ThemeName))
                 {
-                    rootPath = Utilities.PathCombine(rootFolder.FullName, Path.DirectorySeparatorChar.ToString());
-                    theme.ThemeName = theme.Owner + "." + theme.Name + ", Oqtane.Client";
+                    theme.ThemeName = theme.ThemeName.Replace("[Owner]", theme.Owner).Replace("[Theme]", theme.Name);
                 }
                 else
                 {
-                    rootPath = Utilities.PathCombine(rootFolder.Parent.FullName, theme.Owner + "." + theme.Name, Path.DirectorySeparatorChar.ToString());
-                    theme.ThemeName = theme.Owner + "." + theme.Name + ", " + theme.Owner + "." + theme.Name + ".Client.Oqtane";
+                    theme.ThemeName = theme.Owner + ".Theme." + theme.Name;
+                }
+
+                if (theme.Template.ToLower().Contains("internal"))
+                {
+                    rootPath = Utilities.PathCombine(rootFolder.FullName, Path.DirectorySeparatorChar.ToString());
+                    theme.ThemeName = theme.ThemeName + ", Oqtane.Client";
+                }
+                else
+                {
+                    rootPath = Utilities.PathCombine(rootFolder.Parent.FullName, theme.Owner + ".Theme." + theme.Name, Path.DirectorySeparatorChar.ToString());
+                    theme.ThemeName = theme.ThemeName + ", " + theme.ThemeName + ".Client.Oqtane";
                 }
 
                 ProcessTemplatesRecursively(new DirectoryInfo(templatePath), rootPath, rootFolder.Name, templatePath, theme);
@@ -151,54 +212,80 @@ namespace Oqtane.Controllers
 
         private void ProcessTemplatesRecursively(DirectoryInfo current, string rootPath, string rootFolder, string templatePath, Theme theme)
         {
+            var tokenReplace = InitializeTokenReplace(rootPath, rootFolder, theme);
+
             // process folder
-            string folderPath = Utilities.PathCombine(rootPath, current.FullName.Replace(templatePath, ""));
-            folderPath = folderPath.Replace("[Owner]", theme.Owner);
-            folderPath = folderPath.Replace("[Theme]", theme.Name);
+            var folderPath = Utilities.PathCombine(rootPath, current.FullName.Replace(templatePath, ""));
+            folderPath = tokenReplace.ReplaceTokens(folderPath);
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
             }
 
-            FileInfo[] files = current.GetFiles("*.*");
+            tokenReplace.AddSource("Folder", folderPath);
+            var files = current.GetFiles("*.*");
             if (files != null)
             {
                 foreach (FileInfo file in files)
                 {
                     // process file
-                    string filePath = Path.Combine(folderPath, file.Name);
-                    filePath = filePath.Replace("[Owner]", theme.Owner);
-                    filePath = filePath.Replace("[Theme]", theme.Name);
+                    var filePath = Path.Combine(folderPath, file.Name);
+                    filePath = tokenReplace.ReplaceTokens(filePath);
+                    tokenReplace.AddSource("File", Path.GetFileName(filePath));
 
-                    string text = System.IO.File.ReadAllText(file.FullName);
-                    text = text.Replace("[Owner]", theme.Owner);
-                    text = text.Replace("[Theme]", theme.Name);
-                    text = text.Replace("[RootPath]", rootPath);
-                    text = text.Replace("[RootFolder]", rootFolder);
-                    text = text.Replace("[Folder]", folderPath);
-                    text = text.Replace("[File]", Path.GetFileName(filePath));
-                    if (theme.Version == "local")
-                    {
-                        text = text.Replace("[FrameworkVersion]", Constants.Version);
-                        text = text.Replace("[ClientReference]", $"<Reference Include=\"Oqtane.Client\"><HintPath>..\\..\\{rootFolder}\\Oqtane.Server\\bin\\Debug\\net6.0\\Oqtane.Client.dll</HintPath></Reference>");
-                        text = text.Replace("[SharedReference]", $"<Reference Include=\"Oqtane.Shared\"><HintPath>..\\..\\{rootFolder}\\Oqtane.Server\\bin\\Debug\\net6.0\\Oqtane.Shared.dll</HintPath></Reference>");
-                    }
-                    else
-                    {
-                        text = text.Replace("[FrameworkVersion]", theme.Version);
-                        text = text.Replace("[ClientReference]", "<PackageReference Include=\"Oqtane.Client\" Version=\"" + theme.Version + "\" />");
-                        text = text.Replace("[SharedReference]", "<PackageReference Include=\"Oqtane.Shared\" Version=\"" + theme.Version + "\" />");
-                    }
+                    var text = System.IO.File.ReadAllText(file.FullName);
+                    text = tokenReplace.ReplaceTokens(text);
                     System.IO.File.WriteAllText(filePath, text);
                 }
 
-                DirectoryInfo[] folders = current.GetDirectories();
-
+                var folders = current.GetDirectories();
                 foreach (DirectoryInfo folder in folders.Reverse())
                 {
                     ProcessTemplatesRecursively(folder, rootPath, rootFolder, templatePath, theme);
                 }
             }
+        }
+
+        private ITokenReplace InitializeTokenReplace(string rootPath, string rootFolder, Theme theme)
+        {
+            var tokenReplace = _serviceProvider.GetService<ITokenReplace>();
+            tokenReplace.AddSource(() =>
+            {
+                return new Dictionary<string, object>
+                {
+                    { "RootPath", rootPath },
+                    { "RootFolder", rootFolder },
+                    { "Owner", theme.Owner },
+                    { "Theme", theme.Name }
+                };
+            });
+
+            if (theme.Version == "local")
+            {
+                tokenReplace.AddSource(() =>
+                {
+                    return new Dictionary<string, object>()
+                            {
+                                { "FrameworkVersion", Constants.Version },
+                                { "ClientReference", $"<Reference Include=\"Oqtane.Client\"><HintPath>..\\..\\{rootFolder}\\Oqtane.Server\\bin\\Debug\\net8.0\\Oqtane.Client.dll</HintPath></Reference>" },
+                                { "SharedReference", $"<Reference Include=\"Oqtane.Shared\"><HintPath>..\\..\\{rootFolder}\\Oqtane.Server\\bin\\Debug\\net8.0\\Oqtane.Shared.dll</HintPath></Reference>" },
+                            };
+                });
+            }
+            else
+            {
+                tokenReplace.AddSource(() =>
+                {
+                    return new Dictionary<string, object>()
+                            {
+                                { "FrameworkVersion", theme.Version },
+                                { "ClientReference", $"<PackageReference Include=\"Oqtane.Client\" Version=\"{theme.Version}\" />" },
+                                { "SharedReference", $"<PackageReference Include=\"Oqtane.Client\" Version=\"{theme.Version}\" />" },
+                            };
+                });
+            }
+
+            return tokenReplace;
         }
     }
 }

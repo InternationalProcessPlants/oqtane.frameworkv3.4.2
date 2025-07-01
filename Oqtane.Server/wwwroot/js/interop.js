@@ -1,11 +1,18 @@
 var Oqtane = Oqtane || {};
 
 Oqtane.Interop = {
-    setCookie: function (name, value, days) {
+    setCookie: function (name, value, days, secure, sameSite) {
         var d = new Date();
         d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
         var expires = "expires=" + d.toUTCString();
-        document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        var cookieString = name + "=" + value + ";" + expires + ";path=/";
+        if (secure) {
+            cookieString += "; secure";
+        }
+        if (sameSite === "Lax" || sameSite === "Strict" || sameSite === "None") {
+            cookieString += "; SameSite=" + sameSite;
+        }
+        document.cookie = cookieString;
     },
     getCookie: function (name) {
         name = name + "=";
@@ -113,7 +120,7 @@ Oqtane.Interop = {
             this.includeLink(links[i].id, links[i].rel, links[i].href, links[i].type, links[i].integrity, links[i].crossorigin, links[i].insertbefore);
         }
     },
-    includeScript: function (id, src, integrity, crossorigin, content, location) {
+    includeScript: function (id, src, integrity, crossorigin, type, content, location) {
         var script;
         if (src !== "") {
             script = document.querySelector("script[src=\"" + CSS.escape(src) + "\"]");
@@ -121,10 +128,17 @@ Oqtane.Interop = {
         else {
             script = document.getElementById(id);
         }
+        if (script !== null) {
+            script.remove();
+            script = null;
+        }
         if (script === null) {
             script = document.createElement("script");
             if (id !== "") {
                 script.id = id;
+            }
+            if (type !== "") {
+                script.type = type;
             }
             if (src !== "") {
                 script.src = src;
@@ -141,42 +155,21 @@ Oqtane.Interop = {
             script.async = false;
             this.addScript(script, location)
                 .then(() => {
-                    console.log(src + ' loaded');
+                    if (src !== "") {
+                        console.log(src + ' loaded');
+                    }
+                    else {
+                        console.log(id + ' loaded');
+                    }
                 })
                 .catch(() => {
-                    console.error(src + ' failed');
+                    if (src !== "") {
+                        console.error(src + ' failed');
+                    }
+                    else {
+                        console.error(id + ' failed');
+                    }
                 });
-        }
-        else {
-            if (script.id !== id) {
-                script.setAttribute('id', id);
-            }
-            if (src !== "") {
-                if (script.src !== this.getAbsoluteUrl(src)) {
-                    script.removeAttribute('integrity');
-                    script.removeAttribute('crossorigin');
-                    script.src = src;
-                }
-                if (integrity !== "") {
-                    if (script.integrity !== integrity) {
-                        script.setAttribute('integrity', integrity);
-                    }
-                } else {
-                    script.removeAttribute('integrity');
-                }
-                if (crossorigin !== "") {
-                    if (script.crossOrigin !== crossorigin) {
-                        script.setAttribute('crossorigin', crossorigin);
-                    }
-                } else {
-                    script.removeAttribute('crossorigin');
-                }
-            }
-            else {
-                if (script.innerHTML !== content) {
-                    script.innerHTML = content;
-                }
-            }
         }
     },
     addScript: function (script, location) {
@@ -212,7 +205,9 @@ Oqtane.Interop = {
             }
             promises.push(new Promise((resolve, reject) => {
                 if (loadjs.isDefined(bundles[b])) {
-                    resolve(true);
+                    loadjs.ready(bundles[b], () => {
+                        resolve(true);
+                    });
                 }
                 else {
                     loadjs(urls, bundles[b], {
@@ -220,14 +215,25 @@ Oqtane.Interop = {
                         returnPromise: true,
                         before: function (path, element) {
                             for (let s = 0; s < scripts.length; s++) {
-                                if (path === scripts[s].href && scripts[s].integrity !== '') {
-                                    element.integrity = scripts[s].integrity;
-                                }
-                                if (path === scripts[s].href && scripts[s].crossorigin !== '') {
-                                    element.crossOrigin = scripts[s].crossorigin;
-                                }
-                                if (path === scripts[s].href && scripts[s].es6module === true) {
-                                    element.type = "module";
+                                if (path === scripts[s].href) {
+                                    if (scripts[s].integrity !== '') {
+                                        element.integrity = scripts[s].integrity;
+                                    }
+                                    if (scripts[s].crossorigin !== '') {
+                                        element.crossOrigin = scripts[s].crossorigin;
+                                    }
+                                    if (scripts[s].es6module === true) {
+                                        element.type = "module";
+                                    }
+                                    if (typeof scripts[s].dataAttributes !== "undefined" && scripts[s].dataAttributes !== null) {
+                                        for (var key in scripts[s].dataAttributes) {
+                                            element.setAttribute(key, scripts[s].dataAttributes[key]);
+                                        }
+                                    }
+                                    if (scripts[s].location === 'body') {
+                                        document.body.appendChild(element);
+                                        return false;  // return false to bypass default DOM insertion mechanism
+                                    }
                                 }
                             }
                         }
@@ -289,64 +295,94 @@ Oqtane.Interop = {
         var fileinput = document.getElementById(id);
         if (fileinput !== null) {
             for (var i = 0; i < fileinput.files.length; i++) {
-                files.push(fileinput.files[i].name);
+                files.push(fileinput.files[i].name + ":" + fileinput.files[i].size);
             }
         }
         return files;
     },
-    uploadFiles: function (posturl, folder, id, antiforgerytoken) {
+    uploadFiles: function (posturl, folder, id, antiforgerytoken, jwt) {
         var fileinput = document.getElementById('FileInput_' + id);
-        var files = fileinput.files;
         var progressinfo = document.getElementById('ProgressInfo_' + id);
         var progressbar = document.getElementById('ProgressBar_' + id);
 
-        progressinfo.setAttribute("style", "display: inline;");
-        progressbar.setAttribute("style", "width: 200px; display: inline;");
+        if (progressinfo !== null && progressbar !== null) {
+            progressinfo.setAttribute("style", "display: inline;");
+            progressinfo.innerHTML = '';
+            progressbar.setAttribute("style", "width: 100%; display: inline;");
+            progressbar.value = 0;
+        }
+
+        var files = fileinput.files;
+        var totalSize = 0;
+        for (var i = 0; i < files.length; i++) {
+            totalSize = totalSize + files[i].size;
+        }
+
+        var maxChunkSizeMB = 1;
+        var bufferChunkSize = maxChunkSizeMB * (1024 * 1024);
+        var uploadedSize = 0;
 
         for (var i = 0; i < files.length; i++) {
-            var FileChunk = [];
+            var fileChunk = [];
             var file = files[i];
-            var MaxFileSizeMB = 1;
-            var BufferChunkSize = MaxFileSizeMB * (1024 * 1024);
-            var FileStreamPos = 0;
-            var EndPos = BufferChunkSize;
-            var Size = file.size;
+            var fileStreamPos = 0;
+            var endPos = bufferChunkSize;
 
-            while (FileStreamPos < Size) {
-                FileChunk.push(file.slice(FileStreamPos, EndPos));
-                FileStreamPos = EndPos;
-                EndPos = FileStreamPos + BufferChunkSize;
+            while (fileStreamPos < file.size) {
+                fileChunk.push(file.slice(fileStreamPos, endPos));
+                fileStreamPos = endPos;
+                endPos = fileStreamPos + bufferChunkSize;
             }
 
-            var TotalParts = FileChunk.length;
-            var PartCount = 0;
+            var totalParts = fileChunk.length;
+            var partCount = 0;
 
-            while (Chunk = FileChunk.shift()) {
-                PartCount++;
-                var FileName = file.name + ".part_" + PartCount.toString().padStart(3, '0') + "_" + TotalParts.toString().padStart(3, '0');
+            while (chunk = fileChunk.shift()) {
+                partCount++;
+                var fileName = file.name + ".part_" + partCount.toString().padStart(3, '0') + "_" + totalParts.toString().padStart(3, '0');
 
                 var data = new FormData();
                 data.append('__RequestVerificationToken', antiforgerytoken);
                 data.append('folder', folder);
-                data.append('formfile', Chunk, FileName);
+                data.append('formfile', chunk, fileName);
                 var request = new XMLHttpRequest();
                 request.open('POST', posturl, true);
+                if (jwt !== "") {
+                    request.setRequestHeader('Authorization', 'Bearer ' + jwt);
+                    request.withCredentials = true;
+                }
                 request.upload.onloadstart = function (e) {
-                    progressinfo.innerHTML = file.name + ' 0%';
-                    progressbar.value = 0;
+                    if (progressinfo !== null && progressbar !== null && progressinfo.innerHTML === '') {
+                        if (files.length === 1) {
+                            progressinfo.innerHTML = file.name;
+                        }
+                        else {
+                            progressinfo.innerHTML = file.name + ", ...";
+                        }
+                    }
                 };
                 request.upload.onprogress = function (e) {
-                    var percent = Math.ceil((e.loaded / e.total) * 100);
-                    progressinfo.innerHTML = file.name + '[' + PartCount + '] ' + percent + '%';
-                    progressbar.value = (percent / 100);
+                    if (progressinfo !== null && progressbar !== null) {
+                        var percent = Math.ceil(((uploadedSize + e.loaded) / totalSize) * 100);
+                        progressbar.value = (percent / 100);
+                    }
                 };
                 request.upload.onloadend = function (e) {
-                    progressinfo.innerHTML = file.name + ' 100%';
-                    progressbar.value = 1;
+                    if (progressinfo !== null && progressbar !== null) {
+                        uploadedSize = uploadedSize + e.total;
+                        var percent = Math.ceil((uploadedSize / totalSize) * 100);
+                        progressbar.value = (percent / 100);
+                    }
                 };
-                request.upload.onerror = function () {
-                    progressinfo.innerHTML = file.name + ' Error: ' + xhr.status;
-                    progressbar.value = 0;
+                request.upload.onerror = function() {
+                    if (progressinfo !== null && progressbar !== null) {
+                        if (files.length === 1) {
+                            progressinfo.innerHTML = file.name + ' Error: ' + request.statusText;
+                        }
+                        else {
+                            progressinfo.innerHTML = ' Error: ' + request.statusText;
+                        }
+                    }
                 };
                 request.send(data);
             }

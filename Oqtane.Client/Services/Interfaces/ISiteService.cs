@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Oqtane.Services
 {
     /// <summary>
-    /// Service to store and retreive <see cref="Site"/> entries
+    /// Service to store and retrieve <see cref="Site"/> entries
     /// </summary>
     public interface ISiteService
     {
@@ -45,6 +45,14 @@ namespace Oqtane.Services
         /// <param name="siteId"></param>
         /// <returns></returns>
         Task DeleteSiteAsync(int siteId);
+
+        /// <summary>
+        /// Returns a list of modules
+        /// </summary>
+        /// <param name="siteId"></param>
+        /// <param name="pageId"></param>
+        /// <returns></returns>
+        Task<List<Module>> GetModulesAsync(int siteId, int pageId);
 
         [PrivateApi]
         [Obsolete("This method is deprecated.", false)]

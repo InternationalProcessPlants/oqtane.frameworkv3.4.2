@@ -16,7 +16,7 @@
 else
 {
     <TabStrip>
-        <TabPanel Name="Manage" ResourceKey="Manage">
+        <TabPanel Name="Manage" ResourceKey="Manage" Heading="Manage">
             <form @ref="form" class="@(validated ? "was-validated" : "needs-validation")" novalidate>
                 <div class="container">
 					<div class="row mb-1 align-items-center">
@@ -45,16 +45,15 @@ else
 				<NavLink class="btn btn-secondary" href="@NavigateUrl()">@SharedLocalizer["Cancel"]</NavLink>
             </form>
         </TabPanel>
-        <TabPanel Name="Upload" ResourceKey="Upload" Security="SecurityAccessLevel.Host">
+        <TabPanel Name="Upload" ResourceKey="Upload" Security="SecurityAccessLevel.Host" Heading="Upload">
             <div class="container">
                 <div class="row mb-1 align-items-center">
                     <Label Class="col-sm-3" HelpText="Upload one or more translations. Once they are uploaded click Install." ResourceKey="LanguageUpload">Translation: </Label>
                     <div class="col-sm-9">
-                        <FileManager Folder="@Constants.PackagesFolder" UploadMultiple="true" />
+                        <FileManager Folder="@Constants.PackagesFolder" UploadMultiple="true" OnUpload="OnUpload" />
                     </div>
                 </div>
             </div>
-            <button type="button" class="btn btn-success" @onclick="InstallTranslations">@SharedLocalizer["Install"]</button>
             <NavLink class="btn btn-secondary" href="@NavigateUrl()">@SharedLocalizer["Cancel"]</NavLink>
         </TabPanel>
     </TabStrip>
@@ -95,7 +94,6 @@ else
 			var language = new Language
 				{
 					SiteId = PageState.Page.SiteId,
-					Name = CultureInfo.GetCultureInfo(_code).DisplayName,
 					Code = _code,
 					IsDefault = (_default == null ? false : Boolean.Parse(_default))
 				};
@@ -125,27 +123,18 @@ else
 		}
 	}
 
-	private async Task InstallTranslations()
-	{
-		try
-		{
-			AddModuleMessage(string.Format(Localizer["Success.Language.Install"], NavigateUrl("admin/system")), MessageType.Success);
-        }
-        catch (Exception ex)
-        {
-            await logger.LogError(ex, "Error Installing Translations");
-        }
-    }
-
     private async Task SetCultureAsync(string culture)
     {
         if (culture != CultureInfo.CurrentUICulture.Name)
         {
             var interop = new Interop(JSRuntime);
             var localizationCookieValue = CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(culture));
-            await interop.SetCookie(CookieRequestCultureProvider.DefaultCookieName, localizationCookieValue, 360);
-
-            NavigationManager.NavigateTo(NavigationManager.Uri, true);
+            await interop.SetCookie(CookieRequestCultureProvider.DefaultCookieName, localizationCookieValue, 360, true, "Lax");
         }
+    }
+
+    private void OnUpload()
+    {
+        AddModuleMessage(string.Format(Localizer["Success.Language.Download"], NavigateUrl("admin/system")), MessageType.Success);
     }
 }

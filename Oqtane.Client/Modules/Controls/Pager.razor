@@ -1,58 +1,137 @@
 @namespace Oqtane.Modules.Controls
 @inherits ModuleControlBase
 @inject IStringLocalizerFactory LocalizerFactory
+@inject IStringLocalizer<SharedResources> SharedLocalizer
 @typeparam TableItem
 
 @if (ItemList != null)
 {
-    @if ((Toolbar == "Top" || Toolbar == "Both") && _pages > 0 && Items.Count() > _maxItems)
+    @if (PageState.RenderMode == RenderModes.Interactive || ModuleState.RenderMode == RenderModes.Interactive)
     {
-        <ul class="pagination justify-content-center my-2">
-            <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => UpdateList(1))><span class="oi oi-media-step-backward" title="start" aria-hidden="true"></span></a>
-            </li>
-            @if (_pages > _displayPages && _displayPages > 1)
-            {
-                <li class="page-item@((_page > _displayPages) ? " app-pager-pointer" : " disabled")">
-                    <a class="page-link" @onclick=@(async () => SkipPages("back"))><span class="oi oi-media-skip-backward" title="skip back" aria-hidden="true"></span></a>
+        @if (!string.IsNullOrEmpty(SearchProperties))
+        {
+            <form autocomplete="off">
+                <div class="input-group my-3 @SearchBoxClass">
+                    <input type="text" id="pagersearch" class="form-control" placeholder=@string.Format(Localizer["SearchPlaceholder"], FormatSearchProperties()) @bind="@_search" />
+                    <button type="button" class="btn btn-primary" @onclick="Search">@SharedLocalizer["Search"]</button>
+                    <button type="button" class="btn btn-secondary" @onclick="Reset">@SharedLocalizer["Reset"]</button>
+                </div>
+            </form>
+        }
+
+        @if ((Toolbar == "Top" || Toolbar == "Both") && _pages > 0 && Items.Count() > _maxItems)
+        {
+            <ul class="pagination justify-content-center my-2">
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => UpdateList(1))><span class="oi oi-media-step-backward" title="start" aria-hidden="true"></span></a>
                 </li>
-            }
-            <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => NavigateToPage("previous"))><span class="oi oi-chevron-left" title="previous" aria-hidden="true"></span></a>
-            </li>
-            @for (int i = _startPage; i <= _endPage; i++)
-            {
-                var pager = i;
-                if (pager == _page)
+                @if (_pages > _displayPages && _displayPages > 1)
                 {
-                    <li class="page-item app-pager-pointer active">
-                        <a class="page-link" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                    <li class="page-item@((_page > _displayPages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" @onclick=@(async () => SkipPages("back"))><span class="oi oi-media-skip-backward" title="skip back" aria-hidden="true"></span></a>
                     </li>
                 }
-                else
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => NavigateToPage("previous"))><span class="oi oi-chevron-left" title="previous" aria-hidden="true"></span></a>
+                </li>
+                @for (int i = _startPage; i <= _endPage; i++)
                 {
-                    <li class="page-item app-pager-pointer">
-                        <a class="page-link" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                    var pager = i;
+                    if (pager == _page)
+                    {
+                        <li class="page-item app-pager-pointer active">
+                            <a class="page-link shadow-none" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item app-pager-pointer">
+                            <a class="page-link shadow-none" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                        </li>
+                    }
+                }
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => NavigateToPage("next"))><span class="oi oi-chevron-right" title="next" aria-hidden="true"></span></a>
+                </li>
+                @if (_pages > _displayPages && _displayPages > 1)
+                {
+                    <li class="page-item@((_endPage < _pages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" @onclick=@(async () => SkipPages("forward"))><span class="oi oi-media-skip-forward" title="skip forward" aria-hidden="true"></span></a>
                     </li>
                 }
-            }
-            <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => NavigateToPage("next"))><span class="oi oi-chevron-right" title="next" aria-hidden="true"></span></a>
-            </li>
-            @if (_pages > _displayPages && _displayPages > 1)
-            {
-                <li class="page-item@((_endPage < _pages) ? " app-pager-pointer" : " disabled")">
-                    <a class="page-link" @onclick=@(async () => SkipPages("forward"))><span class="oi oi-media-skip-forward" title="skip forward" aria-hidden="true"></span></a>
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => UpdateList(_pages))><span class="oi oi-media-step-forward" title="end" aria-hidden="true"></span></a>
                 </li>
-            }
-            <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => UpdateList(_pages))><span class="oi oi-media-step-forward" title="end" aria-hidden="true"></span></a>
-            </li>
-            <li class="page-item disabled">
-                <a class="page-link" style="white-space: nowrap;">@Localizer["PageOfPages", _page, _pages]</a>
-            </li>
-        </ul>
+                <li class="page-item disabled">
+                    <a class="page-link shadow-none" style="white-space: nowrap;">@Localizer["PageOfPages", _page, _pages]</a>
+                </li>
+            </ul>
+        }
     }
+    else
+    {
+        @if (!string.IsNullOrEmpty(SearchProperties))
+        {
+            <form method="post" autocomplete="off" @formname="PagerForm" @onsubmit="Search" data-enhance>
+                <input type="hidden" name="@Constants.RequestVerificationToken" value="@SiteState.AntiForgeryToken" />
+                <div class="input-group my-3 @SearchBoxClass">
+                    <input type="text" id="pagersearch" name="_search" class="form-control" placeholder=@string.Format(Localizer["SearchPlaceholder"], FormatSearchProperties()) @bind="@_search" />
+                    <button type="submit" class="btn btn-primary">@SharedLocalizer["Search"]</button>
+                    <a class="btn btn-secondary" href="@PageUrl(1, "")">@SharedLocalizer["Reset"]</a>
+                </div>
+            </form>
+        }
+
+        @if ((Toolbar == "Top" || Toolbar == "Both") && _pages > 0 && Items.Count() > _maxItems)
+        {
+            <ul class="pagination justify-content-center my-2">
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(1, _search)"><span class="oi oi-media-step-backward" title="start" aria-hidden="true"></span></a>
+                </li>
+                @if (_pages > _displayPages && _displayPages > 1)
+                {
+                    <li class="page-item@((_page > _displayPages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" href="@PageUrl(_startPage - 1, _search)"><span class="oi oi-media-skip-backward" title="skip back" aria-hidden="true"></span></a>
+                    </li>
+                }
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(((_page > 1) ? _page - 1 : _page), _search)"><span class="oi oi-chevron-left" title="previous" aria-hidden="true"></span></a>
+                </li>
+                @for (int i = _startPage; i <= _endPage; i++)
+                {
+                    var pager = i;
+                    if (pager == _page)
+                    {
+                        <li class="page-item app-pager-pointer active">
+                            <a class="page-link shadow-none" href="@PageUrl(pager, _search)">@pager</a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item app-pager-pointer">
+                            <a class="page-link shadow-none" href="@PageUrl(pager, _search)">@pager</a>
+                        </li>
+                    }
+                }
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(((_page < _pages) ? _page + 1 : _page), _search)"><span class="oi oi-chevron-right" title="next" aria-hidden="true"></span></a>
+                </li>
+                @if (_pages > _displayPages && _displayPages > 1)
+                {
+                    <li class="page-item@((_endPage < _pages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" href="@PageUrl(_endPage + 1, _search)"><span class="oi oi-media-skip-forward" title="skip forward" aria-hidden="true"></span></a>
+                    </li>
+                }
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(_pages, _search)"><span class="oi oi-media-step-forward" title="end" aria-hidden="true"></span></a>
+                </li>
+                <li class="page-item disabled">
+                    <a class="page-link shadow-none" style="white-space: nowrap;">@Localizer["PageOfPages", _page, _pages]</a>
+                </li>
+            </ul>
+        }
+    }
+
     @if (Format == "Table" && Row != null)
     {
         <div class="table-responsive">
@@ -116,53 +195,106 @@
             }
         </div>
     }
+
     @if ((Toolbar == "Bottom" || Toolbar == "Both") && _pages > 0 && Items.Count() > _maxItems)
     {
-        <ul class="pagination justify-content-center my-2">
-            <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => UpdateList(1))><span class="oi oi-media-step-backward" title="start" aria-hidden="true"></span></a>
-            </li>
-            @if (_pages > _displayPages && _displayPages > 1)
-            {
-                <li class="page-item@((_page > _displayPages) ? " app-pager-pointer" : " disabled")">
-                    <a class="page-link" @onclick=@(async () => SkipPages("back"))><span class="oi oi-media-skip-backward" title="skip back" aria-hidden="true"></span></a>
+        @if (PageState.RenderMode == RenderModes.Interactive || ModuleState.RenderMode == RenderModes.Interactive)
+        {
+            <ul class="pagination justify-content-center my-2">
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => UpdateList(1))><span class="oi oi-media-step-backward" title="start" aria-hidden="true"></span></a>
                 </li>
-            }
-            <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => NavigateToPage("previous"))><span class="oi oi-chevron-left" title="previous" aria-hidden="true"></span></a>
-            </li>
-            @for (int i = _startPage; i <= _endPage; i++)
-            {
-                var pager = i;
-                if (pager == _page)
+                @if (_pages > _displayPages && _displayPages > 1)
                 {
-                    <li class="page-item app-pager-pointer active">
-                        <a class="page-link" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                    <li class="page-item@((_page > _displayPages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" @onclick=@(async () => SkipPages("back"))><span class="oi oi-media-skip-backward" title="skip back" aria-hidden="true"></span></a>
                     </li>
                 }
-                else
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => NavigateToPage("previous"))><span class="oi oi-chevron-left" title="previous" aria-hidden="true"></span></a>
+                </li>
+                @for (int i = _startPage; i <= _endPage; i++)
                 {
-                    <li class="page-item app-pager-pointer">
-                        <a class="page-link" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                    var pager = i;
+                    if (pager == _page)
+                    {
+                        <li class="page-item app-pager-pointer active">
+                            <a class="page-link shadow-none" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item app-pager-pointer">
+                            <a class="page-link shadow-none" @onclick=@(async () => UpdateList(pager))>@pager</a>
+                        </li>
+                    }
+                }
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => NavigateToPage("next"))><span class="oi oi-chevron-right" title="next" aria-hidden="true"></span></a>
+                </li>
+                @if (_pages > _displayPages && _displayPages > 1)
+                {
+                    <li class="page-item@((_endPage < _pages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" @onclick=@(async () => SkipPages("forward"))><span class="oi oi-media-skip-forward" title="skip forward" aria-hidden="true"></span></a>
                     </li>
                 }
-            }
-            <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => NavigateToPage("next"))><span class="oi oi-chevron-right" title="next" aria-hidden="true"></span></a>
-            </li>
-            @if (_pages > _displayPages && _displayPages > 1)
-            {
-                <li class="page-item@((_endPage < _pages) ? " app-pager-pointer" : " disabled")">
-                    <a class="page-link" @onclick=@(async () => SkipPages("forward"))><span class="oi oi-media-skip-forward" title="skip forward" aria-hidden="true"></span></a>
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" @onclick=@(async () => UpdateList(_pages))><span class="oi oi-media-step-forward" title="end" aria-hidden="true"></span></a>
                 </li>
-            }
-            <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
-                <a class="page-link" @onclick=@(async () => UpdateList(_pages))><span class="oi oi-media-step-forward" title="end" aria-hidden="true"></span></a>
-            </li>
-            <li class="page-item disabled">
-                <a class="page-link" style="white-space: nowrap;">@Localizer["PageOfPages", _page, _pages]</a>
-            </li>
-        </ul>
+                <li class="page-item disabled">
+                    <a class="page-link shadow-none" style="white-space: nowrap;">@Localizer["PageOfPages", _page, _pages]</a>
+                </li>
+            </ul>
+        }
+        else
+        {
+            <ul class="pagination justify-content-center my-2">
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(1, _search)"><span class="oi oi-media-step-backward" title="start" aria-hidden="true"></span></a>
+                </li>
+                @if (_pages > _displayPages && _displayPages > 1)
+                {
+                    <li class="page-item@((_page > _displayPages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" href="@PageUrl(_startPage - 1, _search)"><span class="oi oi-media-skip-backward" title="skip back" aria-hidden="true"></span></a>
+                    </li>
+                }
+                <li class="page-item@((_page > 1) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(((_page > 1) ? _page - 1 : _page), _search)"><span class="oi oi-chevron-left" title="previous" aria-hidden="true"></span></a>
+                </li>
+                @for (int i = _startPage; i <= _endPage; i++)
+                {
+                    var pager = i;
+                    if (pager == _page)
+                    {
+                        <li class="page-item app-pager-pointer active">
+                            <a class="page-link shadow-none" href="@PageUrl(pager, _search)">@pager</a>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="page-item app-pager-pointer">
+                            <a class="page-link shadow-none" href="@PageUrl(pager, _search)">@pager</a>
+                        </li>
+                    }
+                }
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(((_page < _pages) ? _page + 1 : _page), _search)"><span class="oi oi-chevron-right" title="next" aria-hidden="true"></span></a>
+                </li>
+                @if (_pages > _displayPages && _displayPages > 1)
+                {
+                    <li class="page-item@((_endPage < _pages) ? " app-pager-pointer" : " disabled")">
+                        <a class="page-link shadow-none" href="@PageUrl(_endPage + 1, _search)"><span class="oi oi-media-skip-forward" title="skip forward" aria-hidden="true"></span></a>
+                    </li>
+                }
+                <li class="page-item@((_page < _pages) ? " app-pager-pointer" : " disabled")">
+                    <a class="page-link shadow-none" href="@PageUrl(_pages, _search)"><span class="oi oi-media-step-forward" title="end" aria-hidden="true"></span></a>
+                </li>
+                <li class="page-item disabled">
+                    <a class="page-link shadow-none" style="white-space: nowrap;">@Localizer["PageOfPages", _page, _pages]</a>
+                </li>
+            </ul>
+        }
+
     }
 }
 
@@ -175,6 +307,9 @@
     private int _startPage = 0;
     private int _endPage = 0;
     private int _columns = 0;
+    private string _search = "";
+
+    private IEnumerable<TableItem> AllItems;
 
     [Parameter]
     public string Format { get; set; } // Table or Grid
@@ -220,6 +355,18 @@
 
     [Parameter]
     public Action<int> OnPageChange { get; set; } // a method to be executed in the calling component when the page changes
+
+    [Parameter]
+    public string SearchProperties { get; set; } // comma delimited list of property names to include in search
+
+    [Parameter]
+    public string SearchBoxClass { get; set; } // class for Search box
+
+    [Parameter]
+    public string Parameters { get; set; } // optional - querystring parameters in the form of "id=x&name=y" used in static render mode
+
+    [SupplyParameterFromForm(FormName = "PagerForm")]
+    public string _Search { get => ""; set => _search = value; }
 
     private IEnumerable<TableItem> ItemList { get; set; }
 
@@ -276,6 +423,20 @@
             }
         }
 
+        if (PageState.QueryString.ContainsKey("search"))
+        {
+            _search = PageState.QueryString["search"];
+        }
+
+        if (!string.IsNullOrEmpty(SearchProperties))
+        {
+            AllItems = Items; // only used in search
+            if (!string.IsNullOrEmpty(_search))
+            {
+                Search();
+            }
+        }
+
         if (!string.IsNullOrEmpty(PageSize))
         {
             _maxItems = int.Parse(PageSize);
@@ -291,13 +452,20 @@
             _displayPages = int.Parse(DisplayPages);
         }
 
-        if (!string.IsNullOrEmpty(CurrentPage))
+        if (PageState.QueryString.ContainsKey("page") && int.TryParse(PageState.QueryString["page"], out int page))
         {
-            _page = int.Parse(CurrentPage);
+            _page = page;
         }
         else
         {
-            _page = 1;
+            if (!string.IsNullOrEmpty(CurrentPage))
+            {
+                _page = int.Parse(CurrentPage);
+            }
+            else
+            {
+                _page = 1;
+            }
         }
         if (_page < 1) _page = 1;
 
@@ -323,10 +491,10 @@
         {
             _endPage = _pages;
         }
-		ItemList = Items.Skip((_page - 1) * _maxItems).Take(_maxItems);
-		StateHasChanged();
-		OnPageChange?.Invoke(_page);
-	}
+        ItemList = Items.Skip((_page - 1) * _maxItems).Take(_maxItems);
+        StateHasChanged();
+        OnPageChange?.Invoke(_page);
+    }
 
     public void UpdateList(int page)
     {
@@ -368,5 +536,97 @@
         }
 
         UpdateList(_page);
+    }
+
+    public void Search()
+    {
+        if (!string.IsNullOrEmpty(_search))
+        {
+            Items = AllItems.Where(item =>
+            {
+                var values = SearchProperties.Split(',')
+                    .Select(itemType => GetPropertyValue(item, itemType))
+                    .Where(value => value != null)
+                    .Select(value => value.ToString().ToLower());
+
+                return values.Any(value => value.Contains(_search.ToLower()));
+            }).ToList();
+        }
+        else
+        {
+            Items = AllItems;
+        }
+        _pages = (int)Math.Ceiling(Items.Count() / (decimal)_maxItems);
+        UpdateList(1);
+    }
+
+    private object GetPropertyValue(object obj, string propertyName)
+    {
+        var index = propertyName.IndexOf(".");
+        if (index != -1)
+        {
+            var propertyInfo = obj.GetType().GetProperty(propertyName.Substring(0, index));
+            if (propertyInfo != null)
+            {
+                return GetPropertyValue(propertyInfo.GetValue(obj), propertyName.Substring(index + 1));
+            }
+            return null;
+        }
+        else
+        {
+            var propertyInfo = obj.GetType().GetProperty(propertyName);
+            if (propertyInfo != null)
+            {
+                return propertyInfo.GetValue(obj);
+            }
+            return null;
+        }
+    }
+
+    public void Reset()
+    {
+        _search = "";
+        Items = AllItems;
+        _pages = (int)Math.Ceiling(Items.Count() / (decimal)_maxItems);
+        UpdateList(1);
+    }
+
+    private string FormatSearchProperties()
+    {
+        var properties = new List<string>();
+        foreach (var property in SearchProperties.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var index = property.LastIndexOf(".");
+            if (index != -1)
+            {
+                properties.Add(property.Substring(index + 1));
+            }
+            else
+            {
+                properties.Add(property);
+            }
+        }
+        return string.Join(",", properties);
+    }
+
+    private string PageUrl(int page, string search)
+    {
+        var parameters = new Dictionary<string, string>(PageState.QueryString);
+        if (parameters.ContainsKey("page")) parameters.Remove("page");
+        parameters.Add("page", page.ToString());
+        if (parameters.ContainsKey("search")) parameters.Remove("search");
+        if (!string.IsNullOrEmpty(search))
+        {
+            parameters.Add("search", search);
+        }
+        if (!string.IsNullOrEmpty(Parameters))
+        {
+            foreach (var parameter in Utilities.ParseQueryString(Parameters))
+            {
+                if (parameters.ContainsKey(parameter.Key)) parameters.Remove(parameter.Key);
+                parameters.Add(parameter.Key, parameter.Value);
+            }
+        }
+        return PageState.Route.AbsolutePath + Utilities.CreateQueryString(parameters);
     }
 }

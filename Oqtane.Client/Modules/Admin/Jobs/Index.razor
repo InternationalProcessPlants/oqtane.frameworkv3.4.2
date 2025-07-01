@@ -10,14 +10,11 @@
 }
 else
 {
-    <ActionLink Action="Log" Class="btn btn-secondary" Text="View Logs" ResourceKey="ViewJobs" />
-    <button type="button" class="btn btn-secondary" @onclick="(async () => await Refresh())">Refresh</button>
-    <br />
+    <button type="button" class="btn btn-secondary" @onclick="Refresh">@Localizer["Refresh.Text"]</button>
     <br />
 
-    <Pager Items="@_jobs">
+    <Pager Items="@_jobs" SearchProperties="Name">
         <Header>
-            <th style="width: 1px;">&nbsp;</th>
             <th style="width: 1px;">&nbsp;</th>
             <th style="width: 1px;">&nbsp;</th>
             <th>@SharedLocalizer["Name"]</th>
@@ -27,9 +24,8 @@ else
             <th style="width: 1px;">&nbsp;</th>
         </Header>
         <Row>
-            <td><ActionLink Action="Edit" Parameters="@($"id=" + context.JobId.ToString())" ResourceKey="EditJob" /></td>
-            <td><ActionDialog Header="Delete Job" Message="Are You Sure You Wish To Delete This Job?" Action="Delete" Security="SecurityAccessLevel.Host" Class="btn btn-danger" OnClick="@(async () => await DeleteJob(context))" ResourceKey="DeleteJob" /></td>
-            <td><ActionLink Action="Log" Class="btn btn-secondary" Parameters="@($"id=" + context.JobId.ToString())" ResourceKey="JobLog" /></td>
+            <td><ActionLink Action="Edit" Text="Edit"  Parameters="@($"id=" + context.JobId.ToString())" ResourceKey="EditJob" /></td>
+            <td><ActionLink Action="Log" Text="Log" Class="btn btn-secondary" Parameters="@($"id=" + context.JobId.ToString())" ResourceKey="JobLog" /></td>
             <td>@context.Name</td>
             <td>@DisplayStatus(context.IsEnabled, context.IsExecuting)</td>
             <td>@DisplayFrequency(context.Interval, context.Frequency)</td>
@@ -46,21 +42,29 @@ else
             </td>
         </Row>
     </Pager>
+
+    <br />
+    <ActionLink Action="Log" Class="btn btn-secondary" Text="View All Logs" ResourceKey="ViewLogs" />
 }
 
 @code {
-	private List<Job> _jobs;
+    private List<Job> _jobs;
 
-	public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
+    public override SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.Host; } }
 
-	protected override async Task OnParametersSetAsync()
-	{
-		_jobs = await JobService.GetJobsAsync();
-		if (_jobs.Count == 0)
-		{
-			AddModuleMessage(string.Format(Localizer["Message.NoJobs"], NavigateUrl("admin/system")), MessageType.Warning);
-		}
-	}
+    protected override async Task OnInitializedAsync()
+    {
+        await GetJobs();
+        if (_jobs.Count == 0)
+        {
+            AddModuleMessage(string.Format(Localizer["Message.NoJobs"], NavigateUrl("admin/system")), MessageType.Warning);
+        }
+    }
+
+    private async Task GetJobs()
+    {
+        _jobs = await JobService.GetJobsAsync();
+    }
 
 	private string DisplayStatus(bool isEnabled, bool isExecuting)
 	{
@@ -112,22 +116,6 @@ else
         return result;
     }
 
-    private async Task DeleteJob(Job job)
-    {
-        try
-        {
-            await JobService.DeleteJobAsync(job.JobId);
-            await logger.LogInformation("Job Deleted {Job}", job);
-			_jobs = await JobService.GetJobsAsync();
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            await logger.LogError(ex, "Error Deleting Job {Job} {Error}", job, ex.Message);
-            AddModuleMessage(Localizer["Error.Job.Delete"], MessageType.Error);
-        }
-    }
-
     private async Task StartJob(int jobId)
     {
         try
@@ -164,7 +152,8 @@ else
 
     private async Task Refresh()
     {
-        _jobs = await JobService.GetJobsAsync();
-        StateHasChanged();
+        ShowProgressIndicator();
+        await GetJobs();
+        HideProgressIndicator();
     }
 }

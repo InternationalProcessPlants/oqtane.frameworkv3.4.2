@@ -1,6 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Oqtane.Infrastructure;
 using Oqtane.Models;
 using Oqtane.Shared;
 
@@ -8,35 +12,58 @@ namespace Oqtane.Repository
 {
     public class UserRoleRepository : IUserRoleRepository
     {
-        private TenantDBContext _db;
+        private readonly IDbContextFactory<TenantDBContext> _dbContextFactory;
         private readonly IRoleRepository _roles;
+        private readonly ITenantManager _tenantManager;
+        private readonly UserManager<IdentityUser> _identityUserManager;
+        private readonly IMemoryCache _cache;
 
-        public UserRoleRepository(TenantDBContext context, IRoleRepository roles)
+        public UserRoleRepository(IDbContextFactory<TenantDBContext> dbContextFactory, IRoleRepository roles, ITenantManager tenantManager, UserManager<IdentityUser> identityUserManager, IMemoryCache cache)
         {
-            _db = context;
+            _dbContextFactory = dbContextFactory;
             _roles = roles;
+            _tenantManager = tenantManager;
+            _identityUserManager = identityUserManager;
+            _cache = cache;
         }
 
         public IEnumerable<UserRole> GetUserRoles(int siteId)
         {
-            return _db.UserRole
+            using var db = _dbContextFactory.CreateDbContext();
+            return db.UserRole
                 .Include(item => item.Role) // eager load roles
                 .Include(item => item.User) // eager load users
-                .Where(item => item.Role.SiteId == siteId || item.Role.SiteId == null);
+                .Where(item => item.Role.SiteId == siteId || item.Role.SiteId == null || siteId == -1).ToList();
         }
 
         public IEnumerable<UserRole> GetUserRoles(int userId, int siteId)
         {
-            return _db.UserRole.Where(item => item.UserId == userId)
+            var alias = _tenantManager.GetAlias();
+            return _cache.GetOrCreate($"userroles:{userId}:{alias.SiteKey}", entry =>
+            {
+                entry.SlidingExpiration = TimeSpan.FromMinutes(30);
+                using var db = _dbContextFactory.CreateDbContext();
+                return db.UserRole
+                    .Include(item => item.Role) // eager load roles
+                    .Include(item => item.User) // eager load users
+                    .Where(item => (item.Role.SiteId == siteId || item.Role.SiteId == null || siteId == -1) && item.UserId == userId).ToList();
+            });
+        }
+
+        public IEnumerable<UserRole> GetUserRoles(string roleName, int siteId)
+        {
+            using var db = _dbContextFactory.CreateDbContext();
+            return db.UserRole
                 .Include(item => item.Role) // eager load roles
                 .Include(item => item.User) // eager load users
-                .Where(item => item.Role.SiteId == siteId || item.Role.SiteId == null || siteId == -1);
+                .Where(item => (item.Role.SiteId == siteId || item.Role.SiteId == null || siteId == -1) && item.Role.Name == roleName).ToList();
         }
 
         public UserRole AddUserRole(UserRole userRole)
         {
-            _db.UserRole.Add(userRole);
-            _db.SaveChanges();
+            using var db = _dbContextFactory.CreateDbContext();
+            db.UserRole.Add(userRole);
+            db.SaveChanges();
 
             // host roles can only exist at global level - remove any site specific user roles
             var role = _roles.GetRole(userRole.RoleId);
@@ -45,13 +72,29 @@ namespace Oqtane.Repository
                 DeleteUserRoles(userRole.UserId);
             }
 
+            if (!userRole.IgnoreSecurityStamp)
+            {
+                UpdateSecurityStamp(userRole.UserId);
+            }
+
+            RefreshCache(userRole.UserId);
+
             return userRole;
         }
 
         public UserRole UpdateUserRole(UserRole userRole)
         {
-            _db.Entry(userRole).State = EntityState.Modified;
-            _db.SaveChanges();
+            using var db = _dbContextFactory.CreateDbContext();
+            db.Entry(userRole).State = EntityState.Modified;
+            db.SaveChanges();
+
+            if (!userRole.IgnoreSecurityStamp)
+            {
+                UpdateSecurityStamp(userRole.UserId);
+            }
+
+            RefreshCache(userRole.UserId);
+
             return userRole;
         }
 
@@ -62,36 +105,93 @@ namespace Oqtane.Repository
 
         public UserRole GetUserRole(int userRoleId, bool tracking)
         {
+            using var db = _dbContextFactory.CreateDbContext();
             if (tracking)
             {
-                return _db.UserRole
+                return db.UserRole
                     .Include(item => item.Role) // eager load roles
                     .Include(item => item.User) // eager load users
                     .FirstOrDefault(item => item.UserRoleId == userRoleId);
             }
             else
             {
-                return _db.UserRole.AsNoTracking()
+                return db.UserRole.AsNoTracking()
                     .Include(item => item.Role) // eager load roles
                     .Include(item => item.User) // eager load users
                     .FirstOrDefault(item => item.UserRoleId == userRoleId);
             }
         }
 
+        public UserRole GetUserRole(int userId, int roleId)
+        {
+            return GetUserRole(userId, roleId, true);
+        }
+
+        public UserRole GetUserRole(int userId, int roleId, bool tracking)
+        {
+            using var db = _dbContextFactory.CreateDbContext();
+            if (tracking)
+            {
+                return db.UserRole
+                    .Include(item => item.Role) // eager load roles
+                    .Include(item => item.User) // eager load users
+                    .FirstOrDefault(item => item.UserId == userId && item.RoleId == roleId);
+            }
+            else
+            {
+                return db.UserRole.AsNoTracking()
+                    .Include(item => item.Role) // eager load roles
+                    .Include(item => item.User) // eager load users
+                    .FirstOrDefault(item => item.UserId == userId && item.RoleId == roleId);
+            }
+        }
+
         public void DeleteUserRole(int userRoleId)
         {
-            UserRole userRole = _db.UserRole.Find(userRoleId);
-            _db.UserRole.Remove(userRole);
-            _db.SaveChanges();
+            using var db = _dbContextFactory.CreateDbContext();
+            var userRole = db.UserRole.Find(userRoleId);
+            db.UserRole.Remove(userRole);
+            db.SaveChanges();
+
+            UpdateSecurityStamp(userRole.UserId);
+            RefreshCache(userRole.UserId);
         }
 
         public void DeleteUserRoles(int userId)
         {
-            foreach (UserRole userRole in _db.UserRole.Where(item => item.UserId == userId && item.Role.SiteId != null))
+            using var db = _dbContextFactory.CreateDbContext();
+            foreach (var userRole in db.UserRole.Where(item => item.UserId == userId && item.Role.SiteId != null))
             {
-                _db.UserRole.Remove(userRole);
+                db.UserRole.Remove(userRole);
             }
-            _db.SaveChanges();
+            db.SaveChanges();
+
+            UpdateSecurityStamp(userId);
+            RefreshCache(userId);
+        }
+
+        private void UpdateSecurityStamp(int userId)
+        {
+            using var db = _dbContextFactory.CreateDbContext();
+            var user = db.User.Find(userId);
+            if (user != null)
+            {
+                var identityuser = _identityUserManager.FindByNameAsync(user.Username).GetAwaiter().GetResult();
+                if (identityuser != null)
+                {
+                    _identityUserManager.UpdateSecurityStampAsync(identityuser).GetAwaiter().GetResult();
+                }
+            }
+        }
+
+        private void RefreshCache(int userId)
+        {
+            var alias = _tenantManager.GetAlias();
+            if (alias != null)
+            {
+                _cache.Remove($"user:{userId}:{alias.SiteKey}");
+                _cache.Remove($"userroles:{userId}:{alias.SiteKey}");
+            }
         }
     }
 }

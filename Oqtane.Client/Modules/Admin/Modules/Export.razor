@@ -15,13 +15,12 @@
 </div>
 
 <button type="button" class="btn btn-success" @onclick="ExportModule">@Localizer["Export"]</button>
-<NavLink class="btn btn-secondary" href="@NavigateUrl()">@SharedLocalizer["Cancel"]</NavLink>
+<NavLink class="btn btn-secondary" href="@PageState.ReturnUrl">@SharedLocalizer["Cancel"]</NavLink>
 
 @code {
     private string _content = string.Empty;
     public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.Edit;
     public override string Title => "Export Content";
-
 
     private async Task ExportModule()
     {

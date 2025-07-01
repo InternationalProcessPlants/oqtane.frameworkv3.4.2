@@ -68,5 +68,21 @@ namespace Oqtane.Models
         /// This gives possible values for dropdown input fields. 
         /// </summary>
         public string Options { get; set; }
+
+        /// <summary>
+        /// Optional RegExp validation expression 
+        /// </summary>
+        public string Validation { get; set; }
+
+        /// <summary>
+        /// Optional number of rows (textarea)
+        /// </summary>
+        public int Rows { get; set; }
+
+        /// <summary>
+        /// Autocomplete setting for the property.
+        /// If set, enable autocomplete for the corresponding input field.
+        /// </summary>
+        public string Autocomplete { get; set; }
     }
 }

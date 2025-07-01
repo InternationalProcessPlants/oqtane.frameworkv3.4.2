@@ -27,6 +27,12 @@
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
+                <Label Class="col-sm-3" For="process" HelpText="Indicates if the current process is 32 bit or 64 bit" ResourceKey="Process">Process: </Label>
+                <div class="col-sm-9">
+                    <input id="process" class="form-control" @bind="@_process" readonly />
+                </div>
+            </div>
+            <div class="row mb-1 align-items-center">
                 <Label Class="col-sm-3" For="machinename" HelpText="Machine Name" ResourceKey="MachineName">Machine Name: </Label>
                 <div class="col-sm-9">
                     <input id="machinename" class="form-control" @bind="@_machinename" readonly />
@@ -60,12 +66,6 @@
                 <Label Class="col-sm-3" For="servertime" HelpText="Server Date/Time (in UTC)" ResourceKey="ServerTime">Server Date/Time: </Label>
                 <div class="col-sm-9">
                     <input id="servertime" class="form-control" @bind="@_servertime" readonly />
-                </div>
-            </div>
-            <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="tickcount" HelpText="Amount Of Time The Service Has Been Available And Operational" ResourceKey="TickCount">Service Uptime: </Label>
-                <div class="col-sm-9">
-                    <input id="tickcount" class="form-control" @bind="@_tickcount" readonly />
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
@@ -133,12 +133,9 @@
                 </div>
             </div>
             <div class="row mb-1 align-items-center">
-                <Label Class="col-sm-3" For="packageservice" HelpText="Specify If The Package Service Is Enabled For Installing Modules, Themes, And Translations" ResourceKey="PackageService">Enable Package Service? </Label>
+                <Label Class="col-sm-3" For="packageregistryurl" HelpText="Specify The Package Manager Service For Installing Modules, Themes, And Translations. If This Field Is Blank It Means The Package Manager Service Is Disabled For This Installation." ResourceKey="PackageManager">Package Manager: </Label>
                 <div class="col-sm-9">
-                    <select id="packageservice" class="form-select" @bind="@_packageservice">
-                        <option value="true">@SharedLocalizer["True"]</option>
-                        <option value="false">@SharedLocalizer["False"]</option>
-                    </select>
+                    <input id="packageregistryurl" class="form-control" @bind="@_packageregistryurl" />
                 </div>
             </div>
         </div>
@@ -168,13 +165,13 @@
 	private string _version = string.Empty;
 	private string _clrversion = string.Empty;
 	private string _osversion = string.Empty;
-	private string _machinename = string.Empty;
+    private string _process = string.Empty;
+    private string _machinename = string.Empty;
 	private string _ipaddress = string.Empty;
 	private string _environment = string.Empty;
 	private string _contentrootpath = string.Empty;
 	private string _webrootpath = string.Empty;
 	private string _servertime = string.Empty;
-	private string _tickcount = string.Empty;
 	private string _workingset = string.Empty;
 	private string _installationid = string.Empty;
 
@@ -182,7 +179,7 @@
 	private string _logginglevel = string.Empty;
 	private string _notificationlevel = string.Empty;
 	private string _swagger = string.Empty;
-	private string _packageservice = string.Empty;
+    private string _packageregistryurl = string.Empty;
 
 	private string _log = string.Empty;
 
@@ -195,13 +192,13 @@
 		{
 			_clrversion = systeminfo["CLRVersion"].ToString();
 			_osversion = systeminfo["OSVersion"].ToString();
-			_machinename = systeminfo["MachineName"].ToString();
+            _process = systeminfo["Process"].ToString();
+            _machinename = systeminfo["MachineName"].ToString();
 			_ipaddress = systeminfo["IPAddress"].ToString();
 			_environment = systeminfo["Environment"].ToString();
 			_contentrootpath = systeminfo["ContentRootPath"].ToString();
 			_webrootpath = systeminfo["WebRootPath"].ToString();
 			_servertime = systeminfo["ServerTime"].ToString() + " UTC";
-			_tickcount = TimeSpan.FromMilliseconds(Convert.ToInt64(systeminfo["TickCount"].ToString())).ToString();
 			_workingset = (Convert.ToInt64(systeminfo["WorkingSet"].ToString()) / 1000000).ToString() + " MB";
 		}
 
@@ -213,7 +210,7 @@
 			_logginglevel = systeminfo["Logging:LogLevel:Default"].ToString();
 			_notificationlevel = systeminfo["Logging:LogLevel:Notify"].ToString();
 			_swagger = systeminfo["UseSwagger"].ToString();
-			_packageservice = systeminfo["PackageService"].ToString();
+            _packageregistryurl = systeminfo["PackageRegistryUrl"].ToString();
 		}
 
 		systeminfo = await SystemService.GetSystemInfoAsync("log");
@@ -232,7 +229,7 @@
 			settings.Add("Logging:LogLevel:Default", _logginglevel);
 			settings.Add("Logging:LogLevel:Notify", _notificationlevel);
 			settings.Add("UseSwagger", _swagger);
-			settings.Add("PackageService", _packageservice);
+			settings.Add("PackageRegistryUrl", _packageregistryurl);
 			await SystemService.UpdateSystemInfoAsync(settings);
 			AddModuleMessage(Localizer["Success.UpdateConfig.Restart"], MessageType.Success);
 		}

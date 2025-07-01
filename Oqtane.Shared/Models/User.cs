@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Oqtane.Models
@@ -39,7 +40,7 @@ namespace Oqtane.Models
         public DateTime? LastLoginOn { get; set; }
 
         /// <summary>
-        /// Tracking information of IP used when the user last worked on this site. 
+        /// IP address when the user last logged in to this site. 
         /// </summary>
         public string LastIPAddress { get; set; }
 
@@ -59,14 +60,19 @@ namespace Oqtane.Models
         public DateTime? TwoFactorExpiry { get; set; }
 
         /// <summary>
+        /// A token indicating if a user's security properties have been modified
+        /// </summary>
+        [NotMapped]
+        public string SecurityStamp { get; set; }
+
+        /// <summary>
         /// Reference to the <see cref="Site"/> this user belongs to.
         /// </summary>
         [NotMapped]
         public int SiteId { get; set; }
 
         /// <summary>
-        /// Role names this user has.
-        /// TODO: todoc - is this comma separated?
+        /// Semi-colon delimited list of role names for the user
         /// </summary>
         [NotMapped]
         public string Roles { get; set; }
@@ -97,7 +103,25 @@ namespace Oqtane.Models
         [NotMapped]
         public string FolderPath
         {
-            get => "Users\\" + UserId.ToString() + "\\";
+            get => "Users/" + UserId.ToString() + "/";
         }
+
+        /// <summary>
+        /// Information if this user's email address is confirmed (set during user creation)
+        /// </summary>
+        [NotMapped]
+        public bool EmailConfirmed { get; set; }
+
+        /// <summary>
+        /// Indicates if new user should be notified by email (set during user creation)
+        /// </summary>
+        [NotMapped]
+        public bool SuppressNotification { get; set; }
+
+        /// <summary>
+        /// Public User Settings
+        /// </summary>
+        [NotMapped]
+        public Dictionary<string, string> Settings { get; set; }
     }
 }

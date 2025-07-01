@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore.Migrations.Operations.Builders;
 using Npgsql;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Oqtane.Databases;
-using Oqtane.Shared;
 
 namespace Oqtane.Database.PostgreSQL
 {
@@ -84,6 +83,11 @@ namespace Oqtane.Database.PostgreSQL
         }
 
         public override string RewriteName(string name)
+        {
+            return _rewriter.RewriteName(name);
+        }
+
+        public override string RewriteName(string name, bool isQuery)
         {
             return _rewriter.RewriteName(name);
         }

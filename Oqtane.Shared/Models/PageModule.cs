@@ -41,7 +41,14 @@ namespace Oqtane.Models
         /// Reference to a Razor Container which wraps this module instance.
         /// </summary>
         public string ContainerType { get; set; }
-
+        /// <summary>
+        /// Start of when this assignment is valid. See also <see cref="ExpiryDate"/>
+        /// </summary>
+        public DateTime? EffectiveDate { get; set; }
+        /// <summary>
+        /// End of when this assignment is valid. See also <see cref="EffectiveDate"/>
+        /// </summary>
+        public DateTime? ExpiryDate { get; set; }
         #region IDeletable Properties
 
         public string DeletedBy { get; set; }
@@ -52,8 +59,12 @@ namespace Oqtane.Models
 
         /// <summary>
         /// The <see cref="Module"/> itself.
-        /// TODO: todoc - unclear if this is always populated
         /// </summary>
         public Module Module { get; set; }
+
+        /// <summary>
+        /// The <see cref="Page"/> itself.
+        /// </summary>
+        public Page Page { get; set; }
     }
 }

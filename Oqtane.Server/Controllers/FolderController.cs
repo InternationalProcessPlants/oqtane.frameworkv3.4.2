@@ -43,6 +43,7 @@ namespace Oqtane.Controllers
             {
                 foreach (Folder folder in _folders.GetFolders(SiteId))
                 {
+                    // note that Browse permission is used for this method
                     if (_userPermissions.IsAuthorized(User, PermissionNames.Browse, folder.PermissionList))
                     {
                         folders.Add(folder);
@@ -64,35 +65,78 @@ namespace Oqtane.Controllers
         public Folder Get(int id)
         {
             Folder folder = _folders.GetFolder(id);
-            if (folder != null && folder.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User, PermissionNames.Browse, folder.PermissionList))
+            if (folder != null && folder.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User, PermissionNames.View, folder.PermissionList))
             {
                 return folder;
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Folder Get Attempt {FolderId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (folder != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Folder Get Attempt {FolderId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
 
-        [HttpGet("{siteId}/{path}")]
+        // GET api/<controller>/path/x/?path=y
+        [HttpGet("path/{siteId}")]
         public Folder GetByPath(int siteId, string path)
         {
-            var folderPath = WebUtility.UrlDecode(path).Replace("\\", "/");
-            if (!folderPath.EndsWith("/"))
+            var folderPath = WebUtility.UrlDecode(path).Replace("\\", "/"); // handle legacy path format
+            folderPath = (folderPath == "/") ? "" : folderPath;
+            if (!folderPath.EndsWith("/") && folderPath != "")
             {
                 folderPath += "/";
             }
             Folder folder = _folders.GetFolder(siteId, folderPath);
-            if (folder != null && folder.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User, PermissionNames.Browse, folder.PermissionList))
+            if (folder == null && User.IsInRole(RoleNames.Host) && path.StartsWith("Users/"))
+            {
+                // create the user folder on this site for the host user
+                var userId = int.Parse(path.ReplaceMultiple(new string[] { "Users", "/" }, ""));
+                folder = _folders.GetFolder(siteId, "Users/");
+                if (folder != null)
+                {
+                    folder = _folders.AddFolder(new Folder
+                    {
+                        SiteId = folder.SiteId,
+                        ParentId = folder.FolderId,
+                        Name = "My Folder",
+                        Type = FolderTypes.Private,
+                        Path = path,
+                        Order = 1,
+                        ImageSizes = "",
+                        Capacity = Constants.UserFolderCapacity,
+                        IsSystem = true,
+                        PermissionList = new List<Permission>
+                        {
+                            new Permission(PermissionNames.Browse, userId, true),
+                            new Permission(PermissionNames.View, RoleNames.Everyone, true),
+                            new Permission(PermissionNames.Edit, userId, true)
+                        }
+                    });
+                }
+            }
+            if (folder != null && folder.SiteId == _alias.SiteId && _userPermissions.IsAuthorized(User, PermissionNames.View, folder.PermissionList))
             {
                 return folder;
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Folder Get Attempt {Path} For Site {SiteId}", path, siteId);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (folder != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Folder Get Attempt {Path} For Site {SiteId}", path, siteId);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }
@@ -124,9 +168,12 @@ namespace Oqtane.Controllers
                             Folder parent = _folders.GetFolder(folder.ParentId.Value);
                             folder.Path = Utilities.UrlCombine(parent.Path, folder.Name);
                         }
-                        folder.Path = folder.Path + "/";
+                        if (!folder.Path.EndsWith("/"))
+                        {
+                            folder.Path = folder.Path + "/";
+                        }
                         folder = _folders.AddFolder(folder);
-                        _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Folder, folder.FolderId, SyncEventActions.Create);
+                        _syncManager.AddSyncEvent(_alias, EntityNames.Folder, folder.FolderId, SyncEventActions.Create);
                         _logger.Log(LogLevel.Information, this, LogFunction.Create, "Folder Added {Folder}", folder);
                     }
                     else
@@ -157,7 +204,7 @@ namespace Oqtane.Controllers
         [Authorize(Roles = RoleNames.Registered)]
         public Folder Put(int id, [FromBody] Folder folder)
         {
-            if (ModelState.IsValid && folder.SiteId == _alias.SiteId && _folders.GetFolder(folder.FolderId, false) != null && _userPermissions.IsAuthorized(User, folder.SiteId, EntityNames.Folder, folder.FolderId, PermissionNames.Edit))
+            if (ModelState.IsValid && folder.SiteId == _alias.SiteId && folder.FolderId == id && _folders.GetFolder(folder.FolderId, false) != null && _userPermissions.IsAuthorized(User, folder.SiteId, EntityNames.Folder, folder.FolderId, PermissionNames.Edit))
             {
                 if (folder.IsPathValid())
                 {
@@ -166,7 +213,10 @@ namespace Oqtane.Controllers
                         Folder parent = _folders.GetFolder(folder.ParentId.Value);
                         folder.Path = Utilities.UrlCombine(parent.Path, folder.Name);
                     }
-                    folder.Path = folder.Path + "/";
+                    if (!folder.Path.EndsWith("/"))
+                    {
+                        folder.Path = folder.Path + "/";
+                    }
 
                     Folder _folder = _folders.GetFolder(id, false);
                     if (_folder.Path != folder.Path && Directory.Exists(_folders.GetFolderPath(_folder)))
@@ -175,7 +225,7 @@ namespace Oqtane.Controllers
                     }
 
                     folder = _folders.UpdateFolder(folder);
-                    _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Folder, folder.FolderId, SyncEventActions.Update);
+                    _syncManager.AddSyncEvent(_alias, EntityNames.Folder, folder.FolderId, SyncEventActions.Update);
                     _logger.Log(LogLevel.Information, this, LogFunction.Update, "Folder Updated {Folder}", folder);
                 }
                 else
@@ -209,7 +259,7 @@ namespace Oqtane.Controllers
                     {
                         folder.Order = order;
                         _folders.UpdateFolder(folder);
-                        _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Folder, folder.FolderId, SyncEventActions.Update);
+                        _syncManager.AddSyncEvent(_alias, EntityNames.Folder, folder.FolderId, SyncEventActions.Update);
                     }
                     order += 2;
                 }
@@ -235,7 +285,7 @@ namespace Oqtane.Controllers
                     Directory.Delete(_folders.GetFolderPath(folder));
                 }
                 _folders.DeleteFolder(id);
-                _syncManager.AddSyncEvent(_alias.TenantId, EntityNames.Folder, folder.FolderId, SyncEventActions.Delete);
+                _syncManager.AddSyncEvent(_alias, EntityNames.Folder, folder.FolderId, SyncEventActions.Delete);
                 _logger.Log(LogLevel.Information, this, LogFunction.Delete, "Folder Deleted {FolderId}", id);
             }
             else

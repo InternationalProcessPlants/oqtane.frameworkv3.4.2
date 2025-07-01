@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Oqtane.Services
 { 
     /// <summary>
-    /// Service to store and retreive notifications (<see cref="Notification"/>)
+    /// Service to store and retrieve notifications (<see cref="Notification"/>)
     /// </summary>
     public interface INotificationService
     {
@@ -17,6 +17,27 @@ namespace Oqtane.Services
         /// <param name="userId"></param>
         /// <returns></returns>
         Task<List<Notification>> GetNotificationsAsync(int siteId, string direction, int userId);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="siteId"></param>
+        /// <param name="direction"></param>
+        /// <param name="userId"></param>
+        /// <param name="count"></param>
+        /// <param name="isRead"></param>
+        /// <returns></returns>
+        Task<List<Notification>> GetNotificationsAsync(int siteId, string direction, int userId, int count, bool isRead);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="siteId"></param>
+        /// <param name="direction"></param>
+        /// <param name="userId"></param>
+        /// <param name="isRead"></param>
+        /// <returns></returns>
+        Task<int> GetNotificationCountAsync(int siteId, string direction, int userId, bool isRead);
 
         /// <summary>
         /// Returns a specific notifications

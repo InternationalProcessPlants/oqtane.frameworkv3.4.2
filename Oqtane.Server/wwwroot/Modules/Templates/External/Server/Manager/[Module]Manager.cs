@@ -1,17 +1,19 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using Microsoft.AspNetCore.Http;
 using Oqtane.Modules;
 using Oqtane.Models;
 using Oqtane.Infrastructure;
+using Oqtane.Interfaces;
 using Oqtane.Enums;
 using Oqtane.Repository;
-using [Owner].[Module].Repository;
+using [Owner].Module.[Module].Repository;
+using System.Threading.Tasks;
 
-namespace [Owner].[Module].Manager
+namespace [Owner].Module.[Module].Manager
 {
-    public class [Module]Manager : MigratableModuleBase, IInstallable, IPortable
+    public class [Module]Manager : MigratableModuleBase, IInstallable, IPortable, ISearchable
     {
         private readonly I[Module]Repository _[Module]Repository;
         private readonly IDBContextDependencies _DBContextDependencies;
@@ -32,7 +34,7 @@ namespace [Owner].[Module].Manager
             return Migrate(new [Module]Context(_DBContextDependencies), tenant, MigrationType.Down);
         }
 
-        public string ExportModule(Module module)
+        public string ExportModule(Oqtane.Models.Module module)
         {
             string content = "";
             List<Models.[Module]> [Module]s = _[Module]Repository.Get[Module]s(module.ModuleId).ToList();
@@ -43,7 +45,7 @@ namespace [Owner].[Module].Manager
             return content;
         }
 
-        public void ImportModule(Module module, string content, string version)
+        public void ImportModule(Oqtane.Models.Module module, string content, string version)
         {
             List<Models.[Module]> [Module]s = null;
             if (!string.IsNullOrEmpty(content))
@@ -57,6 +59,29 @@ namespace [Owner].[Module].Manager
                     _[Module]Repository.Add[Module](new Models.[Module] { ModuleId = module.ModuleId, Name = [Module].Name });
                 }
             }
+        }
+
+        public Task<List<SearchContent>> GetSearchContentsAsync(PageModule pageModule, DateTime lastIndexedOn)
+        {
+           var searchContentList = new List<SearchContent>();
+
+           foreach (var [Module] in _[Module]Repository.Get[Module]s(pageModule.ModuleId))
+           {
+               if ([Module].ModifiedOn >= lastIndexedOn)
+               {
+                   searchContentList.Add(new SearchContent
+                   {
+                       EntityName = "[Owner][Module]",
+                       EntityId = [Module].[Module]Id.ToString(),
+                       Title = [Module].Name,
+                       Body = [Module].Name,
+                       ContentModifiedBy = [Module].ModifiedBy,
+                       ContentModifiedOn = [Module].ModifiedOn
+                   });
+               }
+           }
+
+           return Task.FromResult(searchContentList);
         }
     }
 }

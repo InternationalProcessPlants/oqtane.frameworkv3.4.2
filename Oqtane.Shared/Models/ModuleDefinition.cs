@@ -34,6 +34,9 @@ namespace Oqtane.Models
             PackageName = "";
             Runtimes = "";
             Template = "";
+            Resources = null;
+            IsAutoEnabled = true;
+            PageTemplates = null;
         }
 
         /// <summary>
@@ -47,7 +50,7 @@ namespace Oqtane.Models
         public string ModuleDefinitionName { get; set; }
 
         /// <summary>
-        /// Nice name to show in admin / edit dialogs.
+        /// Friendly name to show in UI
         /// </summary>
         public string Name { get; set; }
 
@@ -94,6 +97,10 @@ namespace Oqtane.Models
         [NotMapped]
         public string ControlTypeRoutes { get; set; }
 
+        /// <summary>
+        /// ReleaseVersions contains a comma delimited list of all official release versions of a module ie "1.0.0,1.0.1"
+        /// Must be set for modules which use SQL scripts or include version-based logic in IInstallable implementations
+        /// </summary>
         [NotMapped]
         public string ReleaseVersions { get; set; }
 
@@ -106,9 +113,21 @@ namespace Oqtane.Models
         [NotMapped]
         public string PackageName { get; set; } // added in 2.1.0
 
+        [NotMapped]
+        public List<Resource> Resources { get; set; } // added in 4.0.0
+
+        [NotMapped]
+        public bool IsAutoEnabled { get; set; } // added in 4.0.0
+
+        [NotMapped]
+        public List<PageTemplate> PageTemplates { get; set; } // added in 4.0.0
+
         // internal properties
         [NotMapped]
         public int SiteId { get; set; }
+
+        [NotMapped]
+        public bool IsEnabled { get; set; }
 
         [NotMapped]
         public string ControlTypeTemplate { get; set; }

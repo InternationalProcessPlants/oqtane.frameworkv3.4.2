@@ -1,103 +1,70 @@
 @namespace Oqtane.UI
-@inject IStringLocalizer<ModuleInstance> Localizer
-@inject ILogService LoggingService
-@inherits ErrorBoundary
+@inject SiteState SiteState
 
-@if (CurrentException is null)
+@if (_comment != null)
 {
-    <ModuleMessage Message="@_message" Type="@_messageType"/>
-    @if (ModuleType != null)
+    @((MarkupString)_comment)
+    @if (PageState.RenderMode == RenderModes.Interactive || ModuleState.RenderMode == RenderModes.Static)
     {
-        <DynamicComponent Type="@ModuleType" Parameters="@ModuleParameters"></DynamicComponent>
-        @if (_progressIndicator)
-        {
-            <div class="app-progress-indicator"></div>
-        }
+        <RenderModeBoundary ModuleState="@ModuleState" PageState="@PageState" SiteState="@SiteState" />
     }
-}
-else 
-{
-	@if (!string.IsNullOrEmpty(_error))
-	{
-		<ModuleMessage Message="@_error" Type="@MessageType.Error"/>
-	}
+    else
+    {
+        <RenderModeBoundary ModuleState="@ModuleState" PageState="@PageState" SiteState="@SiteState" @rendermode="InteractiveRenderMode.GetInteractiveRenderMode(PageState.Site.Runtime, _prerender)" />
+    }
 }
 
 @code {
-	private string _message;
-	private string _error;
-	private MessageType _messageType;
-	private bool _progressIndicator = false;
+    [CascadingParameter]
+    protected PageState PageState { get; set; }
 
-	private Type ModuleType { get; set; }
-	private IDictionary<string, object> ModuleParameters { get; set; }
+    [CascadingParameter]
+    private Module ModuleState { get; set; }
 
-	[CascadingParameter]
-	protected PageState PageState { get; set; }
+    private bool _prerender;
+    private string _comment;
 
-	[CascadingParameter]
-	private Module ModuleState { get; set; }
+    protected override void OnParametersSet()
+    {
+        _prerender = ModuleState.Prerender ?? PageState.Site.Prerender;
 
-	private ModuleMessage ModuleMessage { get; set; }
+        _comment = "<!-- rendermode: ";
+        if (PageState.RenderMode == RenderModes.Static && ModuleState.RenderMode == RenderModes.Static)
+        {
+            _comment += RenderModes.Static;
+        }
+        else
+        {
+            _comment += $"{RenderModes.Interactive}:{PageState.Runtime} - prerender: {_prerender}";
+        }
+        _comment += " -->";
 
-	protected override void OnParametersSet()
-	{
-		_message = "";
-		if (!string.IsNullOrEmpty(ModuleState.ModuleType))
-		{
-			ModuleType = Type.GetType(ModuleState.ModuleType);
-			if (ModuleType != null)
-			{
-				ModuleParameters = new Dictionary<string, object> { { "ModuleInstance", this } };
-				return;
-			}
-			// module does not exist with typename specified
-			_message = string.Format(Localizer["Error.Module.InvalidName"], Utilities.GetTypeNameLastSegment(ModuleState.ModuleType, 0));
-			_messageType = MessageType.Error;
-		}
-		else
-		{
-			_message = string.Format(Localizer["Error.Module.InvalidType"], ModuleState.ModuleDefinitionName);
-			_messageType = MessageType.Error;
-		}
-	}
-
-	public void AddModuleMessage(string message, MessageType type)
-	{
-		_message = message;
-		_messageType = type;
-		_progressIndicator = false;
-		StateHasChanged();
-	}
-
-	public void ShowProgressIndicator()
-	{
-		_progressIndicator = true;
-		StateHasChanged();
-	}
-
-	public void HideProgressIndicator()
-	{
-		_progressIndicator = false;
-		StateHasChanged();
-	}
-
-	protected override async Task OnErrorAsync(Exception exception)
-	{
-		// retrieve friendly localized error
-		_error =  Localizer["Error.Module.Exception"];
-		// log error
-		string category = GetType().AssemblyQualifiedName;
-		string feature = Utilities.GetTypeNameLastSegment(category, 1);
-		await LoggingService.Log(null, ModuleState.PageId, ModuleState.ModuleId, PageState.User?.UserId, category, feature, LogFunction.Other, LogLevel.Error, exception, "An Unexpected Error Has Occurred In {ModuleDefinitionName}: {Error}", ModuleState.ModuleDefinitionName, exception.Message);
-		await base.OnErrorAsync(exception);
-		return;
-	}
-
-	public new void Recover()
-	{
-		_error = "";
-		base.Recover();
+        if (PageState.RenderMode == RenderModes.Static && ModuleState.RenderMode == RenderModes.Interactive)
+        {
+            // trim PageState to mitigate page bloat caused by Blazor serializing/encrypting state when crossing render mode boundaries
+            // please note that this performance optimization results in the PageState.Pages property not being available for use in Interactive components
+            PageState.Site.Pages = new List<Page>();
+        }
     }
 
+
+    [Obsolete("AddModuleMessage is deprecated. Use AddModuleMessage in ModuleBase instead.", false)]
+    public void AddModuleMessage(string message, MessageType type)
+    {
+    }
+
+    [Obsolete("AddModuleMessage is deprecated. Use ModuleBase.AddModuleMessage instead.", false)]
+    public void AddModuleMessage(string message, MessageType type, string position)
+    {
+    }
+
+    [Obsolete("ShowProgressIndicator is deprecated. Use ShowProgressIndicator in ModuleBase instead.", false)]
+    public void ShowProgressIndicator()
+    {
+    }
+
+    [Obsolete("HideProgressIndicator is deprecated. Use HideProgressIndicator in ModuleBase instead.", false)]
+    public void HideProgressIndicator()
+    {
+    }
 }

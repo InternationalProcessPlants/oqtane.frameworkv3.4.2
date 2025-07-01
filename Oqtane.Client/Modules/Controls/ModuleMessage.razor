@@ -2,15 +2,25 @@
 @inherits ModuleControlBase
 @inject NavigationManager NavigationManager
 
-@if (!string.IsNullOrEmpty(_message))
+@if (!string.IsNullOrEmpty(Message))
 {
     <div class="@_classname alert-dismissible fade show mb-3" role="alert">
-        @((MarkupString)_message)
+        @((MarkupString)Message)
         @if (Type == MessageType.Error && PageState != null && UserSecurity.IsAuthorized(PageState.User, RoleNames.Host))
         {
-            @((MarkupString)"&nbsp;&nbsp;")<NavLink href="@NavigateUrl("admin/log")">View Details</NavLink>
+            <NavLink class="ms-2" href="@NavigateUrl("admin/log")">View Details</NavLink>
         }
-        <button type="button" class="btn-close" aria-label="Close" @onclick="DismissModal"></button>
+        @if (ModuleState != null)
+        {
+            @if (ModuleState.RenderMode == RenderModes.Static)
+            {
+                <a href="@NavigationManager.Uri" class="btn-close" data-dismiss="alert" aria-label="close"></a>
+            }
+            else
+            {
+                <button type="button" class="btn-close" data-dismiss="alert" aria-label="close" @onclick="CloseMessage"></button>
+            }
+        }
     </div>
 }
 
@@ -23,6 +33,9 @@
 
     [Parameter]
     public MessageType Type { get; set; }
+
+    [Parameter]
+    public RenderModeBoundary Parent { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -54,10 +67,15 @@
 
         return classname;
     }
-
-    private void DismissModal()
+    private void CloseMessage(MouseEventArgs e)
     {
-        _message = "";
-        StateHasChanged();
+        if(Parent != null)
+        {
+            Parent.DismissMessage();
+        }
+        else
+        {
+            NavigationManager.NavigateTo(NavigationManager.Uri);
+        }
     }
 }

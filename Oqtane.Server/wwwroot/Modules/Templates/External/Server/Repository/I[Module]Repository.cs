@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using [Owner].[Module].Models;
+using System.Threading.Tasks;
 
-namespace [Owner].[Module].Repository
+namespace [Owner].Module.[Module].Repository
 {
     public interface I[Module]Repository
     {

@@ -9,6 +9,7 @@ using Oqtane.UI;
 using System.Collections.Generic;
 using Microsoft.JSInterop;
 using System.Linq;
+using System.Dynamic;
 
 namespace Oqtane.Modules
 {
@@ -36,7 +37,7 @@ namespace Oqtane.Modules
         protected Module ModuleState { get; set; }
 
         [Parameter]
-        public ModuleInstance ModuleInstance { get; set; }
+        public RenderModeBoundary RenderModeBoundary { get; set; }
 
         // optional interface properties
         public virtual SecurityAccessLevel SecurityAccessLevel { get { return SecurityAccessLevel.View; } set { } } // default security
@@ -48,6 +49,10 @@ namespace Oqtane.Modules
         public virtual bool UseAdminContainer { get { return true; } }
 
         public virtual List<Resource> Resources { get; set; }
+
+        public virtual string RenderMode { get { return RenderModes.Interactive; } } // interactive by default
+
+        public virtual bool? Prerender { get { return null; } } // allows the Site Prerender property to be overridden
 
         // url parameters
         public virtual string UrlParametersTemplate { get; set; }
@@ -70,22 +75,41 @@ namespace Oqtane.Modules
         {
             if (firstRender)
             {
-                if (Resources != null && Resources.Exists(item => item.ResourceType == ResourceType.Script))
+                List<Resource> resources = null;
+                var type = GetType();
+                if (type.BaseType == typeof(ModuleBase))
+                {
+                    if (PageState.Page.Resources != null)
+                    {
+                        resources = PageState.Page.Resources.Where(item => item.ResourceType == ResourceType.Script && item.Level == ResourceLevel.Module && item.Namespace == type.Namespace).ToList();
+                    }
+                }
+                else // modulecontrolbase
+                {
+                    if (Resources != null)
+                    {
+                        resources = Resources.Where(item => item.ResourceType == ResourceType.Script).ToList();
+                    }
+                }
+                if (resources != null && resources.Any())
                 {
                     var interop = new Interop(JSRuntime);
                     var scripts = new List<object>();
                     var inline = 0;
-                    foreach (Resource resource in Resources.Where(item => item.ResourceType == ResourceType.Script))
+                    foreach (Resource resource in resources)
                     {
-                        if (!string.IsNullOrEmpty(resource.Url))
+                        if (string.IsNullOrEmpty(resource.RenderMode) || resource.RenderMode == RenderModes.Interactive)
                         {
-                            var url = (resource.Url.Contains("://")) ? resource.Url : PageState.Alias.BaseUrl + resource.Url;
-                            scripts.Add(new { href = url, bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", es6module = resource.ES6Module });
-                        }
-                        else
-                        {
-                            inline += 1;
-                            await interop.IncludeScript(GetType().Namespace.ToLower() + inline.ToString(), "", "", "", resource.Content, resource.Location.ToString().ToLower());
+                            if (!string.IsNullOrEmpty(resource.Url))
+                            {
+                                var url = (resource.Url.Contains("://")) ? resource.Url : PageState.Alias.BaseUrl + resource.Url;
+                                scripts.Add(new { href = url, bundle = resource.Bundle ?? "", integrity = resource.Integrity ?? "", crossorigin = resource.CrossOrigin ?? "", es6module = resource.ES6Module, location = resource.Location.ToString().ToLower() });
+                            }
+                            else
+                            {
+                                inline += 1;
+                                await interop.IncludeScript(GetType().Namespace.ToLower() + inline.ToString(), "", "", "", resource.Content, resource.Location.ToString().ToLower());
+                            }
                         }
                     }
                     if (scripts.Any())
@@ -96,6 +120,11 @@ namespace Oqtane.Modules
             }
         }
 
+        protected override bool ShouldRender()
+        {
+            return PageState?.RenderId == ModuleState?.RenderId;
+        }
+
         // path method
 
         public string ModulePath()
@@ -104,6 +133,8 @@ namespace Oqtane.Modules
         }
 
         // url methods
+
+        // navigate url
         public string NavigateUrl()
         {
             return NavigateUrl(PageState.Page.Path);
@@ -119,24 +150,65 @@ namespace Oqtane.Modules
             return NavigateUrl(PageState.Page.Path, refresh);
         }
 
-        public string NavigateUrl(string path, string parameters)
+        public string NavigateUrl(string path, string querystring)
         {
-            return Utilities.NavigateUrl(PageState.Alias.Path, path, parameters);
+            return Utilities.NavigateUrl(PageState.Alias.Path, path, querystring);
+        }
+
+        public string NavigateUrl(string path, Dictionary<string, string> querystring)
+        {
+            return NavigateUrl(path, Utilities.CreateQueryString(querystring));
         }
 
         public string NavigateUrl(string path, bool refresh)
         {
-            return Utilities.NavigateUrl(PageState.Alias.Path, path, refresh ? "refresh" : "");
+            return NavigateUrl(path, refresh ? "refresh" : "");
         }
 
+        public string NavigateUrl(int moduleId, string action)
+        {
+            return EditUrl(PageState.Page.Path, moduleId, action, "");
+        }
+
+        public string NavigateUrl(int moduleId, string action, string querystring)
+        {
+            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
+        }
+
+        public string NavigateUrl(int moduleId, string action, Dictionary<string, string> querystring)
+        {
+            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
+        }
+
+        public string NavigateUrl(string path, int moduleId, string action)
+        {
+            return EditUrl(path, moduleId, action, "");
+        }
+
+        public string NavigateUrl(string path, int moduleId, string action, string querystring)
+        {
+            return EditUrl(path, moduleId, action, querystring);
+        }
+
+        public string NavigateUrl(string path, int moduleId, string action, Dictionary<string, string> querystring)
+        {
+            return EditUrl(path, moduleId, action, querystring);
+        }
+
+        // edit url
         public string EditUrl(string action)
         {
             return EditUrl(ModuleState.ModuleId, action);
         }
 
-        public string EditUrl(string action, string parameters)
+        public string EditUrl(string action, string querystring)
         {
-            return EditUrl(ModuleState.ModuleId, action, parameters);
+            return EditUrl(ModuleState.ModuleId, action, querystring);
+        }
+
+        public string EditUrl(string action, Dictionary<string, string> querystring)
+        {
+            return EditUrl(ModuleState.ModuleId, action, querystring);
         }
 
         public string EditUrl(int moduleId, string action)
@@ -144,16 +216,27 @@ namespace Oqtane.Modules
             return EditUrl(moduleId, action, "");
         }
 
-        public string EditUrl(int moduleId, string action, string parameters)
+        public string EditUrl(int moduleId, string action, string querystring)
         {
-            return EditUrl(PageState.Page.Path, moduleId, action, parameters);
+            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
         }
 
-        public string EditUrl(string path, int moduleid, string action, string parameters)
+        public string EditUrl(int moduleId, string action, Dictionary<string, string> querystring)
         {
-            return Utilities.EditUrl(PageState.Alias.Path, path, moduleid, action, parameters);
+            return EditUrl(PageState.Page.Path, moduleId, action, querystring);
         }
 
+        public string EditUrl(string path, int moduleid, string action, string querystring)
+        {
+            return Utilities.EditUrl(PageState.Alias.Path, path, moduleid, action, querystring);
+        }
+
+        public string EditUrl(string path, int moduleid, string action, Dictionary<string, string> querystring)
+        {
+            return EditUrl(path, moduleid, action, Utilities.CreateQueryString(querystring));
+        }
+
+        // file url
         public string FileUrl(string folderpath, string filename)
         {
             return FileUrl(folderpath, filename, false);
@@ -172,6 +255,8 @@ namespace Oqtane.Modules
         {
             return Utilities.FileUrl(PageState.Alias, fileid, download);
         }
+
+        // image url
 
         public string ImageUrl(int fileid, int width, int height)
         {
@@ -243,34 +328,70 @@ namespace Oqtane.Modules
         // UI methods
         public void AddModuleMessage(string message, MessageType type)
         {
-            ModuleInstance.AddModuleMessage(message, type);
+            AddModuleMessage(message, type, "top");
+        }
+
+        public void AddModuleMessage(string message, MessageType type, string position)
+        {
+            RenderModeBoundary.AddModuleMessage(message, type, position);
         }
 
         public void ClearModuleMessage()
         {
-            ModuleInstance.AddModuleMessage("", MessageType.Undefined);
+            RenderModeBoundary.AddModuleMessage("", MessageType.Undefined);
         }
 
         public void ShowProgressIndicator()
         {
-            ModuleInstance.ShowProgressIndicator();
+            RenderModeBoundary.ShowProgressIndicator();
         }
 
         public void HideProgressIndicator()
         {
-            ModuleInstance.HideProgressIndicator();
+            RenderModeBoundary.HideProgressIndicator();
         }
 
         public void SetModuleTitle(string title)
         {
-            var obj = new { PageModuleId = ModuleState.PageModuleId, Title = title };
+            dynamic obj = new ExpandoObject();
+            obj.PageModuleId = ModuleState.PageModuleId;
+            obj.Title = title;
             SiteState.Properties.ModuleTitle = obj;
         }
 
         public void SetModuleVisibility(bool visible)
         {
-            var obj = new { PageModuleId = ModuleState.PageModuleId, Visible = visible };
+            dynamic obj = new ExpandoObject();
+            obj.PageModuleId = ModuleState.PageModuleId;
+            obj.Visible = visible;
             SiteState.Properties.ModuleVisibility = obj;
+        }
+
+        public void SetPageTitle(string title)
+        {
+            SiteState.Properties.PageTitle = title;
+        }
+
+        // note - only supports links and meta tags - not scripts
+        public void AddHeadContent(string content)
+        {
+            SiteState.AppendHeadContent(content);
+        }
+
+        public void AddScript(Resource resource)
+        {
+            resource.ResourceType = ResourceType.Script;
+            if (Resources == null) Resources = new List<Resource>();
+            if (!Resources.Any(item => (!string.IsNullOrEmpty(resource.Url) && item.Url == resource.Url) || (!string.IsNullOrEmpty(resource.Content) && item.Content == resource.Content)))
+            {
+                Resources.Add(resource);
+            }
+        }
+
+        public async Task ScrollToPageTop()
+        {
+            var interop = new Interop(JSRuntime);
+            await interop.ScrollTo(0, 0, "smooth");
         }
 
         // logging methods
@@ -427,5 +548,8 @@ namespace Oqtane.Modules
         {
             return Utilities.FileUrl(PageState.Alias, fileid, asAttachment);
         }
+
+        // Referencing ModuleInstance methods from ModuleBase is deprecated. Use the ModuleBase methods instead
+        public ModuleInstance ModuleInstance { get { return new ModuleInstance(); } }
     }
 }

@@ -9,13 +9,19 @@
 <div class="row flex-xl-nowrap gx-0">
     <div class="sidebar">
         <nav class="navbar">
-            <Logo /><Menu Orientation="Vertical" />
+            <Logo UseSiteNameAsFallback="true" />
+            <Menu Orientation="Vertical" />
         </nav>
     </div>
 
     <div class="main g-0">
         <div class="top-row px-4">
-            <div class="ms-auto"><UserProfile /> <Login /> <ControlPanel /></div>
+            <div class="ms-auto">
+                <Search CssClass="me-3 text-center d-inline-block" />
+                <UserProfile />
+                <Login />
+                <ControlPanel LanguageDropdownAlignment="right" />
+            </div>
         </div>
         <div class="container">
             <div class="row px-4">
@@ -31,9 +37,11 @@
     public override List<Resource> Resources => new List<Resource>()
     {
 		// obtained from https://cdnjs.com/libraries
-        new Resource { ResourceType = ResourceType.Stylesheet, Url = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.0/css/bootstrap.min.css", Integrity = "sha512-XWTTruHZEYJsxV3W/lSXG1n3Q39YIWOstqvmFsdNEEQfHoZ6vm6E9GK2OrF6DSJSpIbRbi+Nn0WDPID9O7xB2Q==", CrossOrigin = "anonymous" },
+        new Resource { ResourceType = ResourceType.Stylesheet, Url = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css", 
+            Integrity = "sha512-jnSuA4Ss2PkkikSOLtYs8BlYIeeIK1h99ty4YfvRPAlzr377vr3CXDb7sb7eEEBYjDtcYj+AjBH3FLv5uSJuXg==", 
+            CrossOrigin = "anonymous" },
         new Resource { ResourceType = ResourceType.Stylesheet, Url = ThemePath() + "Theme.css" },
-        new Resource { ResourceType = ResourceType.Script, Bundle = "Bootstrap", Url = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.0/js/bootstrap.bundle.min.js", Integrity = "sha512-9GacT4119eY3AcosfWtHMsT5JyZudrexyEVzTBWV3viP/YfB9e2pEy3N7WXL3SV6ASXpTU0vzzSxsbfsuUH4sQ==", CrossOrigin = "anonymous" }
+        new Resource { ResourceType = ResourceType.Script, Url = Constants.BootstrapScriptUrl, Integrity = Constants.BootstrapScriptIntegrity, CrossOrigin = "anonymous", Location = ResourceLocation.Body },
     };
 
 }

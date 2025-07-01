@@ -34,6 +34,7 @@ namespace Oqtane.Controllers
                 case "environment":
                     systeminfo.Add("CLRVersion", Environment.Version.ToString());
                     systeminfo.Add("OSVersion", Environment.OSVersion.ToString());
+                    systeminfo.Add("Process", (Environment.Is64BitProcess) ? "64 Bit" : "32 Bit");
                     systeminfo.Add("MachineName", Environment.MachineName);
                     systeminfo.Add("WorkingSet", Environment.WorkingSet.ToString());
                     systeminfo.Add("TickCount", Environment.TickCount64.ToString());
@@ -46,13 +47,13 @@ namespace Oqtane.Controllers
                     break;
                 case "configuration":
                     systeminfo.Add("InstallationId", _configManager.GetInstallationId());
-                    systeminfo.Add("Runtime", _configManager.GetSetting("Runtime", "Server"));
-                    systeminfo.Add("RenderMode", _configManager.GetSetting("RenderMode", "ServerPrerendered"));
+                    systeminfo.Add("RenderMode", _configManager.GetSetting("RenderMode", RenderModes.Interactive));
+                    systeminfo.Add("Runtime", _configManager.GetSetting("Runtime", Runtimes.Server));
                     systeminfo.Add("DetailedErrors", _configManager.GetSetting("DetailedErrors", "false"));
                     systeminfo.Add("Logging:LogLevel:Default", _configManager.GetSetting("Logging:LogLevel:Default", "Information"));
                     systeminfo.Add("Logging:LogLevel:Notify", _configManager.GetSetting("Logging:LogLevel:Notify", "Error"));
                     systeminfo.Add("UseSwagger", _configManager.GetSetting("UseSwagger", "true"));
-                    systeminfo.Add("PackageService", _configManager.GetSetting("PackageService", "true"));
+                    systeminfo.Add("PackageRegistryUrl", _configManager.GetSetting("PackageRegistryUrl", Constants.PackageRegistryUrl));
                     break;
                 case "log":
                     string log = "";
@@ -74,7 +75,6 @@ namespace Oqtane.Controllers
             return systeminfo;
         }
 
-
         // GET: api/<controller>
         [HttpGet("{key}/{value}")]
         [Authorize(Roles = RoleNames.Host)]
@@ -92,6 +92,26 @@ namespace Oqtane.Controllers
             {
                 UpdateSetting(kvp.Key, kvp.Value);
             }
+        }
+
+        // GET: api/<controller>/icons
+        [HttpGet("icons")]
+        public Dictionary<string, string> Get()
+        {
+            var icons = new Dictionary<string, string>();
+
+            // use reflection to get list of icons from Icons class
+            Type iconsType = typeof(Icons);
+            System.Reflection.FieldInfo[] fields = iconsType.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.GetField);
+            foreach (System.Reflection.FieldInfo field in fields)
+            {
+                if (field.FieldType == typeof(string))
+                {
+                    icons.Add((string)field.GetValue(null), field.Name); // ie. ("oi oi-home", "Home")
+                }
+            }
+
+            return icons;
         }
 
         private void UpdateSetting(string key, object value)

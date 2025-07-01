@@ -163,10 +163,10 @@
     <value>Enter the site name</value>
   </data>
   <data name="Tenant.HelpText" xml:space="preserve">
-    <value>The name of the database used for the site</value>
+    <value>The name of the database used for the site. Note that this is not the physical database name but rather the tenant name which is used within the framework to identify a database.</value>
   </data>
   <data name="Aliases.HelpText" xml:space="preserve">
-    <value>The aliases for the site. An alias can be a domain name (www.site.com) or a virtual folder (ie. www.site.com/folder).</value>
+    <value>The urls for the site. This can include domain names (ie. domain.com), subdomains (ie. sub.domain.com) or virtual folders (ie. domain.com/folder).</value>
   </data>
   <data name="IsDeleted.HelpText" xml:space="preserve">
     <value>Is this site deleted?</value>
@@ -175,7 +175,7 @@
     <value>Specify a logo for the site</value>
   </data>
   <data name="FavoriteIcon.HelpText" xml:space="preserve">
-    <value>Specify a Favicon</value>
+    <value>Specify a Favicon. The format for the image must be 16×16, 32×32, 48×48, or 64×64 pixels in size, and 8-bit, 24-bit, or 32-bit in color depth. The format of the image must be ICO, PNG, or GIF.</value>
   </data>
   <data name="DefaultTheme.HelpText" xml:space="preserve">
     <value>Select the sites default theme</value>
@@ -217,7 +217,7 @@
     <value>Database: </value>
   </data>
   <data name="Aliases.Text" xml:space="preserve">
-    <value>Aliases: </value>
+    <value>Urls:</value>
   </data>
   <data name="IsDeleted.Text" xml:space="preserve">
     <value>Deleted? </value>
@@ -274,19 +274,19 @@
     <value>Select Theme</value>
   </data>
   <data name="Hosting.Heading" xml:space="preserve">
-    <value>Hosting Model</value>
+    <value>UI Component Settings</value>
   </data>
   <data name="Prerender.HelpText" xml:space="preserve">
-    <value>Specifies if the site should be prerendered (for search crawlers, etc...)</value>
+    <value>Specifies if interactive components should prerender their output on the server</value>
   </data>
   <data name="Prerender.Text" xml:space="preserve">
-    <value>Prerender? </value>
+    <value>Prerender: </value>
   </data>
-  <data name="Runtime.HelpText" xml:space="preserve">
-    <value>The Blazor runtime hosting model</value>
+  <data name="RenderMode.HelpText" xml:space="preserve">
+    <value>The default render mode for the site</value>
   </data>
-  <data name="Runtime.Text" xml:space="preserve">
-    <value>Runtime: </value>
+  <data name="RenderMode.Text" xml:space="preserve">
+    <value>Render Mode:</value>
   </data>
   <data name="Browse" xml:space="preserve">
     <value>Browse</value>
@@ -307,10 +307,13 @@
     <value>Type:</value>
   </data>
   <data name="ConnectionString.HelpText" xml:space="preserve">
-    <value>The connection information for the database</value>
+    <value>The name of the connection string in appsettings.json which will be used to connect to the database</value>
   </data>
   <data name="Database.HelpText" xml:space="preserve">
     <value>The type of database</value>
+  </data>
+  <data name="DeleteSite.Header" xml:space="preserve">
+    <value>Delete Site</value>
   </data>
   <data name="DeleteSite.Text" xml:space="preserve">
     <value>Delete Site</value>
@@ -322,10 +325,10 @@
     <value>Default Alias: </value>
   </data>
   <data name="Aliases.Heading" xml:space="preserve">
-    <value>Aliases</value>
+    <value>Site Urls</value>
   </data>
   <data name="AliasName" xml:space="preserve">
-    <value>Name</value>
+    <value>Url</value>
   </data>
   <data name="AliasDefault" xml:space="preserve">
     <value>Default?</value>
@@ -350,5 +353,86 @@
   </data>
   <data name="SiteMap.Text" xml:space="preserve">
     <value>Site Map:</value>
+  </data>
+  <data name="Appearance.Heading" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="HeadContent.HelpText" xml:space="preserve">
+    <value>Optionally enter content to be included in the page head (ie. meta, link, or script tags)</value>
+  </data>
+  <data name="HeadContent.Text" xml:space="preserve">
+    <value>Head Content:</value>
+  </data>
+  <data name="BodyContent.HelpText" xml:space="preserve">
+    <value>Optionally enter content to be included in the page body (ie. script tags)</value>
+  </data>
+  <data name="BodyContent.Text" xml:space="preserve">
+    <value>Body Content:</value>
+  </data>
+  <data name="PageContent.Heading" xml:space="preserve">
+    <value>Page Content</value>
+  </data>
+  <data name="SMTPEnabled.HelpText" xml:space="preserve">
+    <value>Specify if SMTP is enabled for this site</value>
+  </data>
+  <data name="SMTPEnabled.Text" xml:space="preserve">
+    <value>Enabled?</value>
+  </data>
+  <data name="Version.HelpText" xml:space="preserve">
+    <value>The site version (for site content migrations)</value>
+  </data>
+  <data name="Version.Text" xml:space="preserve">
+    <value>Version:</value>
+  </data>
+  <data name="DeleteAlias.Text" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="DeleteAlias.Header" xml:space="preserve">
+    <value>Delete Alias</value>
+  </data>
+  <data name="SiteGuid.HelpText" xml:space="preserve">
+    <value>The Unique Identifier For The Site</value>
+  </data>
+  <data name="SiteGuid.Text" xml:space="preserve">
+    <value>ID:</value>
+  </data>
+  <data name="Retention.HelpText" xml:space="preserve">
+    <value>Number of days of notifications to retain</value>
+  </data>
+  <data name="Retention.Text" xml:space="preserve">
+    <value>Retention (Days):</value>
+  </data>
+  <data name="ImageExtensions.HelpText" xml:space="preserve">
+    <value>Enter a comma separated list of image file extensions</value>
+  </data>
+  <data name="ImageExtensions.Text" xml:space="preserve">
+    <value>Image Extensions:</value>
+  </data>
+  <data name="UploadableFileExtensions.HelpText" xml:space="preserve">
+    <value>Enter a comma separated list of uploadable file extensions</value>
+  </data>
+  <data name="UploadableFileExtensions.Text" xml:space="preserve">
+    <value>Uploadable File Extensions:</value>
+  </data>
+  <data name="HybridEnabled.HelpText" xml:space="preserve">
+    <value>Specifies if the site can be integrated with an external .NET MAUI hybrid application</value>
+  </data>
+  <data name="HybridEnabled.Text" xml:space="preserve">
+    <value>Hybrid Enabled?</value>
+  </data>
+  <data name="Runtime.HelpText" xml:space="preserve">
+    <value>The render mode for UI components which require interactivity</value>
+  </data>
+  <data name="Runtime.Text" xml:space="preserve">
+    <value>Interactivity:</value>
+  </data>
+  <data name="TextEditor.HelpText" xml:space="preserve">
+    <value>Select the text editor for the site</value>
+  </data>
+  <data name="TextEditor.Text" xml:space="preserve">
+    <value>Text Editor:</value>
+  </data>
+  <data name="Functionality" xml:space="preserve">
+    <value>Functionality</value>
   </data>
 </root>

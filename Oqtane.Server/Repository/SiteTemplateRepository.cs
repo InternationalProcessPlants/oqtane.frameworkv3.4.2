@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Oqtane.Infrastructure;
 using Oqtane.Models;
+using Oqtane.Shared;
 
 namespace Oqtane.Repository
 {
@@ -34,17 +35,23 @@ namespace Oqtane.Repository
 
         private List<SiteTemplate> LoadSiteTemplatesFromAssembly(List<SiteTemplate> siteTemplates, Assembly assembly)
         {
-            SiteTemplate siteTemplate;
             Type[] siteTemplateTypes = assembly.GetTypes().Where(item => item.GetInterfaces().Contains(typeof(ISiteTemplate))).ToArray();
             foreach (Type siteTemplateType in siteTemplateTypes)
             {
                 var siteTemplateObject = ActivatorUtilities.CreateInstance(_serviceProvider, siteTemplateType);
-                siteTemplate = new SiteTemplate
+                if (siteTemplateObject != null)
                 {
-                    Name = (string)siteTemplateType.GetProperty("Name")?.GetValue(siteTemplateObject),
-                    TypeName = siteTemplateType.AssemblyQualifiedName
-                };
-                siteTemplates.Add(siteTemplate);
+                    var typename = Utilities.GetFullTypeName(siteTemplateType.AssemblyQualifiedName);
+                    var name = (string)siteTemplateType.GetProperty("Name")?.GetValue(siteTemplateObject);
+                    if (typename != Constants.AdminSiteTemplate && !string.IsNullOrEmpty(name))
+                    {
+                        siteTemplates.Add(new SiteTemplate
+                        {
+                            Name = name,
+                            TypeName = typename
+                        });
+                    }
+                }
             }
             return siteTemplates;
         }

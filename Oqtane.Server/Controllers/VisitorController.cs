@@ -8,6 +8,7 @@ using Oqtane.Infrastructure;
 using Oqtane.Repository;
 using System.Net;
 using System;
+using System.Globalization;
 
 namespace Oqtane.Controllers
 {
@@ -33,7 +34,7 @@ namespace Oqtane.Controllers
             int SiteId;
             if (int.TryParse(siteid, out SiteId) && SiteId == _alias.SiteId)
             {
-                return _visitors.GetVisitors(SiteId, DateTime.Parse(fromdate));
+                return _visitors.GetVisitors(SiteId, DateTime.ParseExact(fromdate, "yyyy-MM-dd", CultureInfo.InvariantCulture));
             }
             else
             {
@@ -64,8 +65,15 @@ namespace Oqtane.Controllers
             }
             else
             {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Visitor Get Attempt {VisitorId}", id);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                if (visitor != null)
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Visitor Get Attempt {VisitorId}", id);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                }
+                else
+                {
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                }
                 return null;
             }
         }

@@ -17,6 +17,12 @@ using Oqtane.Security;
 using Oqtane.Shared;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Logging;
+using Oqtane.Components;
+using Oqtane.UI;
+using OqtaneSSR.Extensions;
+using Microsoft.AspNetCore.Components.Authorization;
+using Oqtane.Providers;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 
 namespace Oqtane
 {
@@ -34,7 +40,9 @@ namespace Oqtane
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath)
                 .AddJsonFile("appsettings.json", false, true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true);
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true)
+                .AddEnvironmentVariables();
+
             Configuration = builder.Build();
 
             _installedCultures = localizationManager.GetInstalledCultures();
@@ -63,24 +71,14 @@ namespace Oqtane
             services.AddOptions<List<Database>>().Bind(Configuration.GetSection(SettingKeys.AvailableDatabasesSection));
             services.Configure<HostOptions>(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(10)); // increase from default of 5 seconds
 
-            services.AddServerSideBlazor()
-                .AddCircuitOptions(options =>
-                {
-                    if (_env.IsDevelopment())
-                    {
-                        options.DetailedErrors = true;
-                    }
-                });
-
-            // setup HttpClient for server side in a client side compatible fashion ( with auth cookie )
-            services.AddHttpClients();
-
             // register scoped core services
             services.AddScoped<IAuthorizationHandler, PermissionHandler>()
-                .AddOqtaneScopedServices()
                 .AddOqtaneServerScopedServices();
 
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+            // setup HttpClient for server side in a client side compatible fashion ( with auth cookie )
+            services.AddHttpClients();
 
             // register singleton scoped core services
             services.AddSingleton(Configuration)
@@ -102,6 +100,7 @@ namespace Oqtane
                 options.Cookie.Name = Constants.AntiForgeryTokenCookieName;
                 options.Cookie.SameSite = SameSiteMode.Strict;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.HttpOnly = true;
             });
 
             services.AddIdentityCore<IdentityUser>(options => { })
@@ -112,15 +111,17 @@ namespace Oqtane
 
             services.ConfigureOqtaneIdentityOptions(Configuration);
 
+            services.AddCascadingAuthenticationState();
+            services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
+            services.AddAuthorization();
+
             services.AddAuthentication(options =>
-                {
-                    options.DefaultAuthenticateScheme = Constants.AuthenticationScheme;
-                    options.DefaultChallengeScheme = Constants.AuthenticationScheme;
-                    options.DefaultSignOutScheme = Constants.AuthenticationScheme;
-                })
-                .AddCookie(Constants.AuthenticationScheme)
-                .AddOpenIdConnect(AuthenticationProviderTypes.OpenIDConnect, options => { })
-                .AddOAuth(AuthenticationProviderTypes.OAuth2, options => { });
+            {
+                options.DefaultScheme = Constants.AuthenticationScheme;
+            })
+            .AddCookie(Constants.AuthenticationScheme)
+            .AddOpenIdConnect(AuthenticationProviderTypes.OpenIDConnect, options => { })
+            .AddOAuth(AuthenticationProviderTypes.OAuth2, options => { });
 
             services.ConfigureOqtaneCookieOptions();
             services.ConfigureOqtaneAuthenticationOptions(Configuration);
@@ -129,12 +130,38 @@ namespace Oqtane
                 .WithSiteIdentity()
                 .WithSiteAuthentication();
 
+            services.AddCors(options =>
+            {
+                options.AddPolicy(Constants.MauiCorsPolicy,
+                    policy =>
+                    {
+                        // allow .NET MAUI client cross origin calls
+                        policy.WithOrigins("https://0.0.0.0", "http://0.0.0.0", "app://0.0.0.0")
+                            .AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+                    });
+            });
+
             services.AddMvc(options =>
             {
                 options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
             })
             .AddOqtaneApplicationParts() // register any Controllers from custom modules
             .ConfigureOqtaneMvc(); // any additional configuration from IStartup classes
+
+            services.AddRazorPages();
+
+            services.AddRazorComponents()
+               .AddInteractiveServerComponents(options =>
+               {
+                   if (_env.IsDevelopment())
+                   {
+                       options.DetailedErrors = true;
+                   }
+               }).AddHubOptions(options =>
+               {
+                   options.MaximumReceiveMessageSize = null; // no limit (for large amounts of data ie. textarea components)
+               })
+               .AddInteractiveWebAssemblyComponents();
 
             services.AddSwaggerGen(options =>
             {
@@ -144,7 +171,7 @@ namespace Oqtane
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ISyncManager sync, ILogger<Startup> logger)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ISyncManager sync, ICorsService corsService, ICorsPolicyProvider corsPolicyProvider, ILogger<Startup> logger)
         {
             if (!string.IsNullOrEmpty(_configureServicesErrors))
             {
@@ -155,13 +182,13 @@ namespace Oqtane
 
             if (env.IsDevelopment())
             {
-                app.UseDeveloperExceptionPage();
                 app.UseWebAssemblyDebugging();
                 app.UseForwardedHeaders();
             }
             else
             {
                 app.UseForwardedHeaders();
+                app.UseExceptionHandler("/Error", createScopeForErrors: true);
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
@@ -173,13 +200,24 @@ namespace Oqtane
             app.UseOqtaneLocalization();
 
             app.UseHttpsRedirection();
-            app.UseStaticFiles();
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                ServeUnknownFileTypes = true,
+                OnPrepareResponse = (ctx) =>
+                {
+                    var policy = corsPolicyProvider.GetPolicyAsync(ctx.Context, Constants.MauiCorsPolicy)
+                        .ConfigureAwait(false).GetAwaiter().GetResult();
+                    corsService.ApplyResult(corsService.EvaluatePolicy(ctx.Context, policy), ctx.Context.Response);
+                }
+            });
+            app.UseExceptionMiddleWare();
             app.UseTenantResolution();
             app.UseJwtAuthorization();
-            app.UseBlazorFrameworkFiles();
             app.UseRouting();
+            app.UseCors();
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseAntiforgery();
 
             if (_useSwagger)
             {
@@ -189,13 +227,26 @@ namespace Oqtane
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapBlazorHub();
                 endpoints.MapControllers();
-                endpoints.MapFallbackToPage("/_Host");
+                endpoints.MapRazorPages();
+            });
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapRazorComponents<App>()
+                    .AddInteractiveServerRenderMode()
+                    .AddInteractiveWebAssemblyRenderMode()
+                    .AddAdditionalAssemblies(typeof(SiteRouter).Assembly);
+            });
+
+            // simulate the fallback routing approach of traditional Blazor - allowing the custom SiteRouter to handle all routing concerns
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapFallback();
             });
 
             // create a global sync event to identify server application startup
-            sync.AddSyncEvent(-1, EntityNames.Host, -1, SyncEventActions.Reload);
+            sync.AddSyncEvent(-1, -1, EntityNames.Host, -1, SyncEventActions.Reload);
         }
     }
 }

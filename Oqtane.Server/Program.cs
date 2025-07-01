@@ -4,9 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore;
 using Microsoft.Extensions.DependencyInjection;
 using Oqtane.Infrastructure;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Oqtane.Shared;
 using Oqtane.Documentation;
 
 namespace Oqtane.Server
@@ -34,6 +32,7 @@ namespace Oqtane.Server
             WebHost.CreateDefaultBuilder(args)
                 .UseConfiguration(new ConfigurationBuilder()
                     .AddCommandLine(args)
+                    .AddEnvironmentVariables()
                     .Build())
                 .UseStartup<Startup>()
                 .ConfigureLocalizationSettings()

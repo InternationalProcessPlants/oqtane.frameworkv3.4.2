@@ -22,7 +22,7 @@
         <div class="row mb-1 align-items-center">
             <Label Class="col-sm-3" For="description" HelpText="The help text displayed to the user for this profile item" ResourceKey="Description">Description: </Label>
             <div class="col-sm-9">
-                <textarea id="description" class="form-control" @bind="@_description" rows="5" maxlength="256" required ></textarea>
+                <textarea id="description" class="form-control" @bind="@_description" rows="3" maxlength="256" required></textarea>
             </div>
         </div>
         <div class="row mb-1 align-items-center">
@@ -34,19 +34,25 @@
         <div class="row mb-1 align-items-center">
             <Label Class="col-sm-3" For="order" HelpText="The index order of where this profile item should be displayed" ResourceKey="Order">Order: </Label>
             <div class="col-sm-9">
-                <input id="order" class="form-control" @bind="@_vieworder" maxlength="4" required />
+                <input id="order" class="form-control" @bind="@_vieworder" min="0" max="9999" type="number" required />
             </div>
         </div>
         <div class="row mb-1 align-items-center">
             <Label Class="col-sm-3" For="length" HelpText="The max number of characters this profile item should accept (enter zero for unlimited)" ResourceKey="Length">Length: </Label>
             <div class="col-sm-9">
-                <input id="length" class="form-control" @bind="@_maxlength" maxlength="4" required />
+                <input id="length" class="form-control" @bind="@_maxlength" min="0" max="524288" type="number" required />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="rows" HelpText="The number of rows for text entry (one is the default)" ResourceKey="Rows">Rows: </Label>
+            <div class="col-sm-9">
+                <input id="rows" class="form-control" @bind="@_rows" min="1" max="10" type="number" required />
             </div>
         </div>
         <div class="row mb-1 align-items-center">
             <Label Class="col-sm-3" For="defaultVal" HelpText="The default value for this profile item" ResourceKey="DefaultValue">Default Value: </Label>
             <div class="col-sm-9">
-                <input id="defaultVal" class="form-control" @bind="@_defaultvalue" maxlength="2000"/>
+                <input id="defaultVal" class="form-control" @bind="@_defaultvalue" maxlength="2000" />
             </div>
         </div>
         <div class="row mb-1 align-items-center">
@@ -65,6 +71,18 @@
             </div>
         </div>
         <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="validation" HelpText="Optionally provide a regular expression (RegExp) for validating the value entered" ResourceKey="Validation">Validation: </Label>
+            <div class="col-sm-9">
+                <input id="validation" class="form-control" @bind="@_validation" maxlength="200" />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
+            <Label Class="col-sm-3" For="autocomplete" HelpText="The HTML autocomplete attribute allows you to specify browser behavior for automated user assistance in filling out form field values. Allowable values are blank (default), 'on', 'off', or any value from the standardized taxonomy defined for this attribute." ResourceKey="Autocomplete">Autocomplete: </Label>
+            <div class="col-sm-9">
+                <input id="autocomplete" class="form-control" @bind="@_autocomplete" maxlength="30" />
+            </div>
+        </div>
+        <div class="row mb-1 align-items-center">
             <Label Class="col-sm-3" For="private" HelpText="Should this profile item be visible to all users?" ResourceKey="Private">Private? </Label>
             <div class="col-sm-9">
                 <select id="private" class="form-select" @bind="@_isprivate" required>
@@ -77,7 +95,7 @@
     <br />
     <button type="button" class="btn btn-success" @onclick="SaveProfile">@SharedLocalizer["Save"]</button>
     <NavLink class="btn btn-secondary" href="@NavigateUrl()">@SharedLocalizer["Cancel"]</NavLink>
-    @if (PageState.QueryString.ContainsKey("id"))
+        @if (PageState.QueryString.ContainsKey("id"))
     {
         <br />
         <br />
@@ -95,8 +113,11 @@
     private string _category = string.Empty;
     private string _vieworder = "0";
     private string _maxlength = "0";
+    private string _rows = "1";
     private string _defaultvalue = string.Empty;
     private string _options = string.Empty;
+    private string _validation = string.Empty;
+    private string _autocomplete = string.Empty;
     private string _isrequired = "False";
     private string _isprivate = "False";
     private string createdby;
@@ -124,8 +145,11 @@
                     _category = profile.Category;
                     _vieworder = profile.ViewOrder.ToString();
                     _maxlength = profile.MaxLength.ToString();
+                    _rows = profile.Rows.ToString();
                     _defaultvalue = profile.DefaultValue;
                     _options = profile.Options;
+                    _validation = profile.Validation;
+                    _autocomplete = profile.Autocomplete;
                     _isrequired = profile.IsRequired.ToString();
                     _isprivate = profile.IsPrivate.ToString();
                     createdby = profile.CreatedBy;
@@ -167,10 +191,14 @@
                 profile.Category = _category;
                 profile.ViewOrder = int.Parse(_vieworder);
                 profile.MaxLength = int.Parse(_maxlength);
+                profile.Rows = int.Parse(_rows);
                 profile.DefaultValue = _defaultvalue;
                 profile.Options = _options;
+                profile.Validation = _validation;
+                profile.Autocomplete = _autocomplete;
                 profile.IsRequired = (_isrequired == null ? false : Boolean.Parse(_isrequired));
                 profile.IsPrivate = (_isprivate == null ? false : Boolean.Parse(_isprivate));
+
                 if (_profileid != -1)
                 {
                     profile = await ProfileService.UpdateProfileAsync(profile);

@@ -16,13 +16,18 @@ namespace Oqtane.UI
             _jsRuntime = jsRuntime;
         }
 
-        public Task SetCookie(string name, string value, int days)
+        public async Task SetCookie(string name, string value, int days)
+        {
+            await SetCookie(name, value, days, true, "Lax");
+        }
+
+        public Task SetCookie(string name, string value, int days, bool secure, string sameSite)
         {
             try
             {
                 _jsRuntime.InvokeVoidAsync(
                     "Oqtane.Interop.setCookie",
-                    name, value, days);
+                    name, value, days, secure, sameSite);
                 return Task.CompletedTask;
             }
             catch
@@ -95,8 +100,8 @@ namespace Oqtane.UI
             try
             {
                 _jsRuntime.InvokeVoidAsync(
-                    "Oqtane.Interop.includeLinks", 
-                    (object) links);
+                    "Oqtane.Interop.includeLinks",
+                    (object)links);
                 return Task.CompletedTask;
             }
             catch
@@ -108,11 +113,16 @@ namespace Oqtane.UI
         // external scripts need to specify src, inline scripts need to specify id and content
         public Task IncludeScript(string id, string src, string integrity, string crossorigin, string content, string location)
         {
+            return IncludeScript(id, src, integrity, crossorigin, "", content, location);
+        }
+
+        public Task IncludeScript(string id, string src, string integrity, string crossorigin, string type, string content, string location)
+        {
             try
             {
                 _jsRuntime.InvokeVoidAsync(
                     "Oqtane.Interop.includeScript",
-                    id, src, integrity, crossorigin, content, location);
+                    id, src, integrity, crossorigin, type, content, location);
                 return Task.CompletedTask;
             }
             catch
@@ -193,13 +203,13 @@ namespace Oqtane.UI
             }
         }
 
-        public Task UploadFiles(string posturl, string folder, string id, string antiforgerytoken)
+        public Task UploadFiles(string posturl, string folder, string id, string antiforgerytoken, string jwt)
         {
             try
             {
                 _jsRuntime.InvokeVoidAsync(
                     "Oqtane.Interop.uploadFiles",
-                    posturl, folder, id, antiforgerytoken);
+                    posturl, folder, id, antiforgerytoken, jwt);
                 return Task.CompletedTask;
             }
             catch

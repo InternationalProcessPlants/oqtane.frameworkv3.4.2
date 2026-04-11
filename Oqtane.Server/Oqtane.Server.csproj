@@ -53,7 +53,7 @@
     <PackageReference Include="Telerik.Documents.Spreadsheet.FormatProviders.Pdf" Version="2026.1.304" />
     <PackageReference Include="Telerik.Documents.SpreadsheetStreaming" Version="2026.1.304" />
     <PackageReference Include="Telerik.SvgIcons" Version="4.8.0" />
-    <PackageReference Include="Telerik.UI.for.Blazor" Version="12.2.0" PrivateAssets="none" />
+    <PackageReference Include="Telerik.UI.for.Blazor" Version="13.1.0" PrivateAssets="none" />
     <PackageReference Include="Telerik.Zip" Version="2026.1.304" />
     <PackageReference Include="Telerik.Licensing" Version="1.8.2" />
   </ItemGroup>

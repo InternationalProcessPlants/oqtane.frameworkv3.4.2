@@ -211,16 +211,30 @@ namespace Oqtane.Infrastructure
                 }
                 if (Path.Exists(filename) && Path.GetExtension(filename).ToLower() == ".dll")
                 {
-                    // ensure assembly version is equal to or greater than existing assembly
-                    var assembly = filename.Replace(Path.GetFileName(filename), "temp.dll");
-                    entry.ExtractToFile(assembly, true);
-                    if (Version.Parse(FileVersionInfo.GetVersionInfo(assembly).FileVersion).CompareTo(Version.Parse(FileVersionInfo.GetVersionInfo(filename).FileVersion)) >= 0)
+                    // an existing assembly must be staged to a temporary file so that its version can be
+                    // compared before it is overwritten. the staging file name must be unique - a shared
+                    // name is not safe when installations run concurrently (ie. a web farm in which several
+                    // instances share a file system and each runs InstallPackages() during startup), because
+                    // one installation can overwrite the staging file between another installation extracting
+                    // it and moving it into place, which silently writes one assembly's content to another
+                    // assembly's file name
+                    var assembly = filename + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    try
                     {
-                        File.Move(assembly, filename, true);
+                        entry.ExtractToFile(assembly, true);
+                        // ensure assembly version is equal to or greater than existing assembly
+                        if (Version.Parse(FileVersionInfo.GetVersionInfo(assembly).FileVersion).CompareTo(Version.Parse(FileVersionInfo.GetVersionInfo(filename).FileVersion)) >= 0)
+                        {
+                            File.Move(assembly, filename, true);
+                        }
                     }
-                    else
+                    finally
                     {
-                        File.Delete(assembly);
+                        // remove the staging file if it was not moved into place
+                        if (File.Exists(assembly))
+                        {
+                            File.Delete(assembly);
+                        }
                     }
                 }
                 else

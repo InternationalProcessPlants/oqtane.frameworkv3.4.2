@@ -65,6 +65,19 @@ namespace Oqtane.Infrastructure
 
                         // load jobs and find current job
                         Job job = jobs.GetJobs().Where(item => item.JobType == jobType).FirstOrDefault();
+
+                        // GetJobs() is served from IMemoryCache, which is local to this process and
+                        // is only invalidated by writes made in this process. On a deployment with
+                        // more than one instance that copy can be arbitrarily stale: it still shows
+                        // the run another instance has already completed as pending, so every
+                        // instance runs every job. Re-read the row from the database before deciding
+                        // whether the job is due. This also stops the code below from mutating the
+                        // instance held in the cache.
+                        if (job != null)
+                        {
+                            job = jobs.GetJob(job.JobId, false);
+                        }
+
                         if (job != null && job.IsEnabled && !job.IsExecuting)
                         {
                             // get next execution date
@@ -85,12 +98,15 @@ namespace Oqtane.Infrastructure
                                 NextExecution = job.NextExecution.Value;
                             }
 
-                            // determine if the job should be run
-                            if (NextExecution <= DateTime.UtcNow && (job.EndDate == null || job.EndDate >= DateTime.UtcNow))
+                            // determine if the job should be run, and claim it. TryClaimJob marks the
+                            // job as executing atomically in the database, so that only one scheduler
+                            // loop runs it even when several find it due at the same moment. It is last
+                            // in the condition so that it is only reached for a job that is due.
+                            if (NextExecution <= DateTime.UtcNow && (job.EndDate == null || job.EndDate >= DateTime.UtcNow)
+                                && jobs.TryClaimJob(job.JobId, DateTime.UtcNow))
                             {
-                                // update the job to indicate it is running
+                                // the claim has already recorded this in the database
                                 job.IsExecuting = true;
-                                jobs.UpdateJob(job);
 
                                 // create a job log entry
                                 JobLog log = new JobLog();
